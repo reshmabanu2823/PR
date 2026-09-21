@@ -38,7 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     fetchMe()
       .then(setUser)
-      .catch(() => setAuthToken(null))
+      .catch((err) => {
+        // Only drop the token when the server rejects it. A network error or an
+        // aborted request (e.g. the OAuth callback navigating away mid-fetch) must not log the user out.
+        if (err?.status === 401 || err?.status === 403) setAuthToken(null);
+      })
       .finally(() => {
         clearTimeout(timeout);
         setLoading(false);

@@ -44,10 +44,10 @@ export default function AuthScreen() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
-    const oauthError = sessionStorage.getItem('argus-oauth-error');
+    const oauthError = sessionStorage.getItem('pragna-oauth-error');
     if (oauthError) {
       toast.error(oauthError);
-      sessionStorage.removeItem('argus-oauth-error');
+      sessionStorage.removeItem('pragna-oauth-error');
     }
   }, []);
 

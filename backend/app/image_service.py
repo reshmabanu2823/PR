@@ -5,7 +5,7 @@ import urllib.parse
 from typing import Any
 import httpx
 
-logger = logging.getLogger("mimir.image")
+logger = logging.getLogger("pragna.image")
 
 STABILITY_API_BASE = "https://api.stability.ai/v2beta/stable-image"
 MODEL = "sd3.5-large-turbo"

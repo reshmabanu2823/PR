@@ -118,7 +118,7 @@ export default function ChatInterface() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Mimir-integrated feature states
+  // Integrated feature states
   const [artifactOpen, setArtifactOpen] = useState(false);
   const [activeArtifact, setActiveArtifact] = useState<{ title: string; content: string; language?: string } | null>(null);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
@@ -458,7 +458,6 @@ export default function ChatInterface() {
         ...((newSources || []).filter(s => !(currentConv?.sources || []).some(e => e.id === s.id))),
       ];
 
-      const customKey = typeof window !== 'undefined' ? localStorage.getItem('claudechat_custom_api_key') : null;
       let customPrompt = typeof window !== 'undefined' ? localStorage.getItem('claudechat_system_prompt') : null;
       if (customPrompt && (customPrompt.includes('Claude') || customPrompt.includes('Anthropic') || customPrompt.includes('helpful AI assistant.'))) {
         localStorage.removeItem('claudechat_system_prompt');
@@ -506,7 +505,6 @@ export default function ChatInterface() {
         body: JSON.stringify({
           messages: history,
           model: effectiveModelId,
-          apiKey: customKey || undefined,
           systemPrompt: customPrompt || undefined,
           userName: clientUserName,
           userEmail: user?.email || undefined,

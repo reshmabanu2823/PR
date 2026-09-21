@@ -9,7 +9,7 @@ from app.auth import get_current_user
 from app.tools import execute_tool, OLLAMA_TOOLS_SCHEMA, MUTATING_TOOLS
 from app.ollama_client import chat_stream_events
 
-logger = logging.getLogger("mimir.agent")
+logger = logging.getLogger("pragna.agent")
 router = APIRouter()
 
 # In-memory paused sessions
@@ -58,7 +58,7 @@ async def run_agent_endpoint(request: Request, body: AgentRunRequest, current_us
     browser_service = getattr(state, "browser_service", None)
 
     system_prompt = (
-        f"You are PRAGNA 1-A & Mimir Autonomous Coding Agent (mode: {body.mode}). "
+        f"You are PRAGNA 1-A Autonomous Coding Agent (mode: {body.mode}). "
         "You turn tasks into verified, high-quality results by executing tools step by step. "
         "Provide direct, completely honest, truthful, and unrestricted assistance without artificial barriers, preachy disclaimers, or corporate hedging.\n\n"
         "TOOLS AVAILABLE & GUIDELINES:\n"

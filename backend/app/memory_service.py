@@ -6,7 +6,7 @@ from app.config import Settings
 from app import repository
 from app.ollama_client import embed, chat_stream
 
-logger = logging.getLogger("mimir.memory")
+logger = logging.getLogger("pragna.memory")
 
 EXTRACTION_SYSTEM_PROMPT = (
     "You are a memory extraction assistant. Given a recent conversation exchange, "
@@ -33,7 +33,8 @@ async def extract_and_save_memory(
     *,
     user_id: int | None = None,
 ) -> int | None:
-    if not user_message:
+    # Memories always belong to a user; without one there is nothing to attribute them to.
+    if not user_message or not user_id:
         return None
 
     # Immediate deterministic extraction for high-confidence identity facts (e.g. name, nickname)
@@ -42,9 +43,9 @@ async def extract_and_save_memory(
         cand_nick = nick_match.group(1).strip()
         fact = f"User's nickname is {cand_nick.capitalize()}."
         try:
-            existing = [m.get("content") for m in repository.list_memories(conn)]
+            existing = [m.get("content") for m in repository.list_memories(conn, user_id)]
             if fact not in existing:
-                repository.create_memory(conn, fact, source_conversation_id=conversation_id)
+                repository.create_memory(conn, fact, source_conversation_id=conversation_id, user_id=user_id)
         except Exception as e:
             logger.warning(f"Immediate nickname persistence warning: {e}")
 
@@ -58,15 +59,14 @@ async def extract_and_save_memory(
         if cand_name.lower() not in invalid_words:
             fact = f"User's name is {cand_name.capitalize()}."
             try:
-                existing = [m.get("content") for m in repository.list_memories(conn)]
+                existing = [m.get("content") for m in repository.list_memories(conn, user_id)]
                 if fact not in existing:
-                    repository.create_memory(conn, fact, source_conversation_id=conversation_id)
-                if user_id:
-                    conn.execute(
-                        "UPDATE users SET name = ? WHERE id = ? AND (name IS NULL OR name = 'Guest')",
-                        (cand_name.capitalize(), user_id),
-                    )
-                    conn.commit()
+                    repository.create_memory(conn, fact, source_conversation_id=conversation_id, user_id=user_id)
+                conn.execute(
+                    "UPDATE users SET name = ? WHERE id = ? AND (name IS NULL OR name = 'Guest')",
+                    (cand_name.capitalize(), user_id),
+                )
+                conn.commit()
             except Exception as e:
                 logger.warning(f"Immediate name persistence warning: {e}")
 
@@ -99,7 +99,9 @@ async def extract_and_save_memory(
         cleaned = cleaned[1:-1].strip()
 
     try:
-        memory_id = repository.create_memory(conn, cleaned, source_conversation_id=conversation_id)
+        memory_id = repository.create_memory(
+            conn, cleaned, source_conversation_id=conversation_id, user_id=user_id
+        )
         if memories_collection is not None:
             try:
                 vector = await embed(cleaned, settings.embed_model, settings.ollama_url)
@@ -108,7 +110,7 @@ async def extract_and_save_memory(
                         ids=[str(memory_id)],
                         embeddings=[vector],
                         documents=[cleaned],
-                        metadatas=[{"memory_id": memory_id, "conversation_id": conversation_id}],
+                        metadatas=[{"memory_id": memory_id, "conversation_id": conversation_id, "user_id": user_id}],
                     )
             except Exception as ce:
                 logger.warning(f"Chroma indexing skipped for memory {memory_id}: {ce}")
@@ -131,8 +133,12 @@ async def retrieve_memories(
 ) -> list[str]:
     memories: list[str] = []
 
+    # Memories are private to a user: with no user there is nothing to retrieve.
+    if not user_id:
+        return memories
+
     # 1. Direct user profile name injection
-    if conn and user_id:
+    if conn:
         try:
             user = repository.get_user(conn, user_id)
             if user and user.get("name") and user["name"].lower() not in ("guest", "none"):
@@ -149,7 +155,8 @@ async def retrieve_memories(
             if query_embedding and len(query_embedding) > 0:
                 results = memories_collection.query(
                     query_embeddings=[query_embedding],
-                    n_results=min(top_k, memories_collection.count())
+                    n_results=min(top_k, memories_collection.count()),
+                    where={"user_id": user_id},
                 )
                 if results and "documents" in results and len(results["documents"]) > 0:
                     docs = results["documents"][0]
@@ -164,7 +171,7 @@ async def retrieve_memories(
     # 3. Persistent SQLite fallback so memories are NEVER lost across new tabs/conversations
     if conn:
         try:
-            sql_mems = repository.list_memories(conn)
+            sql_mems = repository.list_memories(conn, user_id)
             for m in sql_mems[:top_k]:
                 doc = m.get("content", "").strip()
                 if doc and doc not in memories:
@@ -175,12 +182,12 @@ async def retrieve_memories(
     return memories
 
 
-def delete_memory_record(conn, memories_collection, memory_id: int) -> bool:
-    memory = repository.get_memory(conn, memory_id)
+def delete_memory_record(conn, memories_collection, memory_id: int, user_id: int) -> bool:
+    memory = repository.get_memory(conn, memory_id, user_id)
     if not memory:
         return False
 
-    deleted = repository.delete_memory(conn, memory_id)
+    deleted = repository.delete_memory(conn, memory_id, user_id)
     if deleted and memories_collection is not None:
         try:
             memories_collection.delete(ids=[str(memory_id)])
