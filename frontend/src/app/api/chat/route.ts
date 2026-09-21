@@ -640,12 +640,18 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
       }
     }
 
+function sanitizeForLlm(text: string): string {
+  if (!text) return '';
+  // Strip huge base64 data URLs from LLM prompts to prevent exceeding the model context limit (262k chars)
+  return text.replace(/data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]{50,}/g, '[image data]');
+}
+
     // Direct Image Generation resolution
     const autoImage = await detectAndExecuteImageGeneration(messages);
     if (autoImage) {
       conversationHistory.push({
         role: 'system',
-        content: `[VERIFIED IMAGE GENERATION RESULT for "${autoImage.prompt}"]:\nAn image has been successfully generated for the user's request.\n\nImage Markdown Embed:\n${autoImage.markdown}\n\nCRITICAL INSTRUCTIONS:\n- You MUST include this EXACT image markdown in your reply:\n${autoImage.markdown}\n- Briefly introduce and describe the image in a sentence or two.\n- Do NOT output generic disclaimers or say you cannot generate images.`,
+        content: `[IMAGE GENERATION RESULT for "${autoImage.prompt}"]:\nAn image has been successfully generated for the user's request.\n\nCRITICAL INSTRUCTIONS:\n- Briefly introduce and describe the generated image in a friendly, engaging sentence or two.\n- Do NOT output generic disclaimers or say you cannot generate images.`,
       });
     }
 
@@ -730,7 +736,7 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
         const toOllamaMessages = (history: any[]) =>
           history.map((m) => {
             if (m.role === 'tool') {
-              return { role: 'tool', tool_name: m.name, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) };
+              return { role: 'tool', tool_name: m.name, content: typeof m.content === 'string' ? sanitizeForLlm(m.content) : JSON.stringify(m.content) };
             }
             if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
               const toolCalls = m.tool_calls.map((tc: any) => {
@@ -740,12 +746,31 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
                 }
                 return { function: { name: tc.function?.name, arguments: args } };
               });
-              return { role: 'assistant', content: flattenContent(m.content), tool_calls: toolCalls };
+              return { role: 'assistant', content: sanitizeForLlm(flattenContent(m.content)), tool_calls: toolCalls };
             }
             const images = extractImages(m.content);
             return images.length > 0
-              ? { role: m.role, content: flattenContent(m.content), images }
-              : { role: m.role, content: flattenContent(m.content) };
+              ? { role: m.role, content: sanitizeForLlm(flattenContent(m.content)), images }
+              : { role: m.role, content: sanitizeForLlm(flattenContent(m.content)) };
+          });
+
+        const toOpenAIMessages = (history: any[]) =>
+          history.map((m) => {
+            const sanitized = typeof m.content === 'string' ? sanitizeForLlm(m.content) : m.content;
+            if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+              return {
+                ...m,
+                content: sanitized,
+                tool_calls: m.tool_calls.map((tc: any) => ({
+                  ...tc,
+                  function: {
+                    ...tc.function,
+                    arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments ?? {}),
+                  },
+                })),
+              };
+            }
+            return { ...m, content: sanitized };
           });
 
         // Stream OpenAI-compatible response WITH tool call detection
@@ -797,23 +822,6 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
             function: { name: tc.name, arguments: tc.args },
           }));
         };
-
-        // Omniroute speaks the OpenAI format, where tool-call arguments are JSON strings.
-        const toOpenAIMessages = (history: any[]) =>
-          history.map((m) =>
-            m.role === 'assistant' && Array.isArray(m.tool_calls)
-              ? {
-                  ...m,
-                  tool_calls: m.tool_calls.map((tc: any) => ({
-                    ...tc,
-                    function: {
-                      ...tc.function,
-                      arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments ?? {}),
-                    },
-                  })),
-                }
-              : m
-          );
 
         // Streams one Ollama /api/chat response: text goes to the client as it arrives,
         // tool calls are collected for the caller to execute.
