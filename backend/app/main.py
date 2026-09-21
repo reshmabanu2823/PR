@@ -55,7 +55,7 @@ def _cors_origins(settings: Settings) -> list[str]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    fastapi_app = FastAPI(title="pragna-mimir", description="PRAGNA 1-A UI + Mimir Engine Backend")
+    fastapi_app = FastAPI(title="pragna", description="PRAGNA 1-A UI + Engine Backend")
     fastapi_app.state.settings = settings
 
     fastapi_app.add_middleware(

@@ -355,7 +355,7 @@ export default function MessageBubble({
                   </div>
                 </div>
               )}
-              <div className="px-4 py-2.5 rounded-2xl user-bubble-bg text-foreground text-sm leading-relaxed border border-border/50 shadow-sm">
+              <div className="px-4 py-2.5 text-foreground text-sm leading-relaxed">
                 {message.images && message.images.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {message.images.map((src, i) => (

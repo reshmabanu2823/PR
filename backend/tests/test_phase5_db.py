@@ -51,12 +51,12 @@ def test_tool_calls_crud(tmp_path):
     cid = repository.create_conversation(conn, "Test Tools", 1)
     mid = repository.add_message(conn, cid, "assistant", "Tool message")
 
-    t_id = repository.create_tool_call(conn, mid, "web_search", {"query": "mimir chatbot"}, status="completed")
+    t_id = repository.create_tool_call(conn, mid, "web_search", {"query": "pragna chatbot"}, status="completed")
     repository.update_tool_call(conn, t_id, {"results": ["found!"]}, status="completed")
 
     t_call = repository.get_tool_call(conn, t_id)
     assert t_call["tool_name"] == "web_search"
-    assert t_call["arguments"] == {"query": "mimir chatbot"}
+    assert t_call["arguments"] == {"query": "pragna chatbot"}
     assert t_call["result"] == {"results": ["found!"]}
     assert t_call["status"] == "completed"
 

@@ -6,7 +6,7 @@ from app.config import Settings
 from app import repository
 from app.ollama_client import embed, chat_stream
 
-logger = logging.getLogger("mimir.memory")
+logger = logging.getLogger("pragna.memory")
 
 EXTRACTION_SYSTEM_PROMPT = (
     "You are a memory extraction assistant. Given a recent conversation exchange, "
