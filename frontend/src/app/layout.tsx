@@ -50,13 +50,15 @@ export default function RootLayout({
         <Toaster
           position="bottom-right"
           toastOptions={{
+            unstyled: true,
             style: {
               background: 'transparent',
               border: 'none',
               boxShadow: 'none',
-              color: '#f0e6d3',
               padding: '0',
+              margin: '0',
             },
+            className: 'bg-transparent border-none shadow-none p-0',
           }}
         />
       </body>

@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import AppLayout from '@/components/AppLayout';
 import SettingsLayout from './components/SettingsLayout';
 
 export default function SettingsPage() {
   return (
     <AppLayout>
-      <SettingsLayout />
+      <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading settings...</div>}>
+        <SettingsLayout />
+      </Suspense>
     </AppLayout>
   );
 }

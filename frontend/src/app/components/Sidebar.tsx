@@ -23,6 +23,7 @@ import {
 import { Conversation, ConversationGroup } from '../types/chat';
 import AppLogo from '@/components/ui/AppLogo';
 import { useAuth } from '@/context/AuthContext';
+import UserProfileMenu from '@/components/UserProfileMenu';
 
 interface SidebarProps {
   open: boolean;
@@ -241,47 +242,9 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* Footer */}
-          <div className="flex-shrink-0 border-t border-sidebar-border">
-            <div className="flex items-center justify-between px-3 py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
-                  <span className="text-xs font-bold text-primary">
-                    {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate leading-tight">
-                    {user?.name || user?.email?.split('@')[0] || 'Account'}
-                  </p>
-                  <p className="text-[0.6875rem] text-muted-foreground/60 truncate">{user?.email}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={onToggleTheme}
-                  className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-hover transition-colors duration-150"
-                  aria-label="Toggle theme"
-                >
-                  {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
-                </button>
-                <button
-                  onClick={() => router.push('/settings')}
-                  className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-hover transition-colors duration-150"
-                  aria-label="Settings"
-                >
-                  <Settings size={13} />
-                </button>
-                <button
-                  onClick={logout}
-                  className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-hover transition-colors duration-150"
-                  aria-label="Log out"
-                  title="Log out"
-                >
-                  <LogOut size={13} />
-                </button>
-              </div>
-            </div>
+          {/* Footer Profile & Settings Menu */}
+          <div className="flex-shrink-0 border-t border-sidebar-border relative">
+            <UserProfileMenu onOpenSearch={onOpenSearch} />
           </div>
         </div>
       </aside>

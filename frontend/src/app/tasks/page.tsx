@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
-import AuthGate from '@/app/components/AuthGate';
 import { getAuthToken } from '@/lib/api';
 import { toast } from 'sonner';
 import {
@@ -93,7 +92,7 @@ const SCHEDULED_STARTERS = [
 
 function StopwatchIllustration() {
   return (
-    <div className="flex items-center justify-center w-20 h-20 text-muted-foreground/70 mb-3">
+    <div className="flex items-center justify-center w-20 h-20 text-[#d4af37]/60 mb-3 drop-shadow-[0_0_16px_rgba(212,175,55,0.15)]">
       <svg viewBox="0 0 64 64" fill="none" className="w-full h-full" stroke="currentColor">
         {/* Top button stem */}
         <line x1="32" y1="5" x2="32" y2="12" strokeWidth="2.5" strokeLinecap="round" />
@@ -114,7 +113,7 @@ function StopwatchIllustration() {
 
 function WavyDivider() {
   return (
-    <div className="w-full flex items-center justify-center my-10 overflow-hidden opacity-25 text-muted-foreground">
+    <div className="w-full flex items-center justify-center my-10 overflow-hidden opacity-30 text-[#d4af37]">
       <svg width="100%" height="10" viewBox="0 0 1000 10" fill="none" preserveAspectRatio="none">
         <path
           d="M0 5 Q 12.5 0, 25 5 T 50 5 T 75 5 T 100 5 T 125 5 T 150 5 T 175 5 T 200 5 T 225 5 T 250 5 T 275 5 T 300 5 T 325 5 T 350 5 T 375 5 T 400 5 T 425 5 T 450 5 T 475 5 T 500 5 T 525 5 T 550 5 T 575 5 T 600 5 T 625 5 T 650 5 T 675 5 T 700 5 T 725 5 T 750 5 T 775 5 T 800 5 T 825 5 T 850 5 T 875 5 T 900 5 T 925 5 T 950 5 T 975 5 T 1000 5"
@@ -144,21 +143,20 @@ export default function ScheduledTasksPage() {
   const [modalDelivery, setModalDelivery] = useState<'notification' | 'chat'>('notification');
   const [submitting, setSubmitting] = useState(false);
 
+  // Load scheduled tasks
   const fetchTasks = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const token = getAuthToken();
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      };
-      const res = await fetch('/api/tools/scheduled', { headers });
+      const res = await fetch('/api/tools/scheduled', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setTasks(data.jobs || []);
       }
-    } catch (err) {
-      console.error('Failed to load scheduled tasks', err);
+    } catch {
+      toast.error('Failed to load scheduled tasks');
     } finally {
       setLoading(false);
     }
@@ -178,24 +176,24 @@ export default function ScheduledTasksPage() {
       setModalPrompt('');
       setModalSchedule('Weekdays at 8:00 AM');
     }
+    setModalDelivery('notification');
     setModalOpen(true);
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalPrompt.trim()) {
-      toast.error('Task prompt cannot be empty');
-      return;
-    }
+    if (!modalPrompt.trim()) return;
+
     setSubmitting(true);
     try {
       const token = getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
       const res = await fetch('/api/tools/scheduled', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers,
         body: JSON.stringify({
           action: 'create',
           title: modalTitle.trim() || 'Untitled scheduled task',
@@ -302,345 +300,345 @@ export default function ScheduledTasksPage() {
   const activeJobs = tasks.filter((t) => t.status === 'active' || t.status === 'paused');
 
   return (
-    <AuthGate>
-      <AppLayout>
-        <div className="flex-1 flex flex-col h-full overflow-y-auto bg-[#171614] text-[#ecebe6] selection:bg-amber-500/20">
-          {/* Main Container */}
-          <div className="max-w-4xl w-full mx-auto px-6 py-10 sm:py-14 flex flex-col flex-1">
-            {/* Header section matching screenshot */}
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-10">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#f3f2ee]">
-                  Scheduled tasks
-                </h1>
-                <p className="text-sm text-[#9e9d96] mt-1.5 font-normal">
-                  Run tasks on a schedule or whenever you need them.
-                </p>
-              </div>
-
-              {/* Right action controls */}
-              <div className="flex items-center gap-2.5 shrink-0 self-start">
-                {/* Search Toggle */}
-                {searchOpen ? (
-                  <div className="flex items-center bg-[#242320] border border-[#3b3a36] rounded-full px-3 py-1 text-xs">
-                    <Search size={13} className="text-[#9e9d96] mr-1.5" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search tasks..."
-                      autoFocus
-                      className="bg-transparent border-0 outline-none text-xs text-[#ecebe6] placeholder:text-[#9e9d96] w-28 sm:w-40"
-                    />
-                    <button onClick={() => { setSearchQuery(''); setSearchOpen(false); }} className="text-[#9e9d96] hover:text-white">
-                      <X size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setSearchOpen(true)}
-                    className="p-2 rounded-full hover:bg-[#262522] text-[#9e9d96] hover:text-white transition-colors"
-                    title="Search scheduled tasks"
-                    aria-label="Search scheduled tasks"
-                  >
-                    <Search size={16} />
-                  </button>
-                )}
-
-                {/* Sort dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#242320] hover:bg-[#2d2c28] text-[#c7c5bc] border border-[#383733] transition-colors"
-                  >
-                    <span>Sort by {sortBy === 'next_run' ? 'Next run' : sortBy === 'name' ? 'Name' : 'Created'}</span>
-                    <ChevronDown size={13} className="text-[#9e9d96]" />
-                  </button>
-
-                  {sortDropdownOpen && (
-                    <div className="absolute right-0 mt-1.5 w-40 rounded-xl bg-[#242320] border border-[#383733] shadow-xl z-50 p-1">
-                      <button
-                        onClick={() => { setSortBy('next_run'); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${sortBy === 'next_run' ? 'bg-white/10 text-white font-medium' : 'text-[#c7c5bc] hover:bg-white/5'}`}
-                      >
-                        Next run
-                      </button>
-                      <button
-                        onClick={() => { setSortBy('created'); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${sortBy === 'created' ? 'bg-white/10 text-white font-medium' : 'text-[#c7c5bc] hover:bg-white/5'}`}
-                      >
-                        Recently created
-                      </button>
-                      <button
-                        onClick={() => { setSortBy('name'); setSortDropdownOpen(false); }}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${sortBy === 'name' ? 'bg-white/10 text-white font-medium' : 'text-[#c7c5bc] hover:bg-white/5'}`}
-                      >
-                        Name (A-Z)
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* New task button */}
-                <button
-                  onClick={() => openNewTaskModal()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#ecebe6] text-[#171614] hover:bg-white active:scale-95 transition-all shadow-sm"
-                >
-                  <span>New task</span>
-                  <ChevronDown size={13} />
-                </button>
-              </div>
+    <AppLayout>
+      <div className="flex-1 flex flex-col h-full overflow-y-auto bg-background text-foreground selection:bg-[#d4af37]/25">
+        {/* Main Container */}
+        <div className="max-w-4xl w-full mx-auto px-6 py-10 sm:py-14 flex flex-col flex-1">
+          {/* Header section matching Pragna Theme */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-10">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                Scheduled <span className="gold-gradient-text">Tasks</span>
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1.5 font-normal">
+                Run tasks on a schedule or whenever you need them.
+              </p>
             </div>
 
-            {/* Active Tasks List (if tasks exist) */}
-            {activeJobs.length > 0 && (
-              <div className="mb-8 space-y-3">
-                <div className="flex items-center justify-between pb-1">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-[#9e9d96]">
-                    Your Scheduled Tasks ({filteredTasks.length})
-                  </h2>
-                  <button onClick={fetchTasks} className="text-[11px] text-[#9e9d96] hover:text-white flex items-center gap-1">
-                    <RotateCcw size={11} className={loading ? 'animate-spin' : ''} />
-                    <span>Refresh</span>
+            {/* Right action controls */}
+            <div className="flex items-center gap-2.5 shrink-0 self-start">
+              {/* Search Toggle */}
+              {searchOpen ? (
+                <div className="flex items-center bg-card border border-border/80 rounded-full px-3 py-1 text-xs shadow-sm">
+                  <Search size={13} className="text-[#d4af37] mr-1.5" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search tasks..."
+                    autoFocus
+                    className="bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted-foreground w-28 sm:w-40"
+                  />
+                  <button onClick={() => { setSearchQuery(''); setSearchOpen(false); }} className="text-muted-foreground hover:text-foreground">
+                    <X size={12} />
                   </button>
                 </div>
+              ) : (
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="p-2 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border"
+                  title="Search scheduled tasks"
+                  aria-label="Search scheduled tasks"
+                >
+                  <Search size={16} />
+                </button>
+              )}
 
-                <div className="grid grid-cols-1 gap-2.5">
-                  {filteredTasks.map((job) => (
-                    <div
-                      key={job.id}
-                      className="p-4 rounded-2xl bg-[#201f1c] hover:bg-[#252420] border border-[#33322e] transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+              {/* Sort dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-card hover:bg-muted text-foreground border border-border shadow-sm transition-colors"
+                >
+                  <span>Sort by {sortBy === 'next_run' ? 'Next run' : sortBy === 'name' ? 'Name' : 'Created'}</span>
+                  <ChevronDown size={13} className="text-muted-foreground" />
+                </button>
+
+                {sortDropdownOpen && (
+                  <div className="absolute right-0 mt-1.5 w-40 rounded-xl bg-card border border-border shadow-premium-lg z-50 p-1">
+                    <button
+                      onClick={() => { setSortBy('next_run'); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${sortBy === 'next_run' ? 'bg-[#d4af37]/15 text-[#d4af37] font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
                     >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-white truncate">
-                            {job.title || job.prompt.slice(0, 36)}
-                          </span>
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${job.status === 'active' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/15 text-amber-300 border-amber-500/20'}`}>
-                            {job.status === 'active' ? 'Active' : 'Paused'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#9e9d96] line-clamp-1">{job.prompt}</p>
-                        <div className="flex items-center gap-3 text-[11px] text-[#7d7c75] pt-0.5">
-                          <span className="flex items-center gap-1 text-[#c7c5bc]">
-                            <Clock size={11} className="text-[#9e9d96]" />
-                            {job.schedule}
-                          </span>
-                          {job.last_run && (
-                            <span>Last run: {new Date(job.last_run).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                        <button
-                          onClick={() => handleRunNow(job)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#2c2b27] hover:bg-[#383732] text-white transition-colors"
-                          title="Run task immediately"
-                        >
-                          <Play size={11} fill="currentColor" />
-                          <span>Run</span>
-                        </button>
-                        <button
-                          onClick={() => handleToggleTask(job.id)}
-                          className="p-1.5 rounded-lg hover:bg-[#2c2b27] text-[#9e9d96] hover:text-white transition-colors"
-                          title={job.status === 'active' ? 'Pause schedule' : 'Resume schedule'}
-                        >
-                          {job.status === 'active' ? <Pause size={13} /> : <Play size={13} />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTask(job.id, job.title)}
-                          className="p-1.5 rounded-lg hover:bg-[#2c2b27] text-[#9e9d96] hover:text-rose-400 transition-colors"
-                          title="Delete scheduled task"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      Next run
+                    </button>
+                    <button
+                      onClick={() => { setSortBy('created'); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${sortBy === 'created' ? 'bg-[#d4af37]/15 text-[#d4af37] font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                    >
+                      Recently created
+                    </button>
+                    <button
+                      onClick={() => { setSortBy('name'); setSortDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${sortBy === 'name' ? 'bg-[#d4af37]/15 text-[#d4af37] font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                    >
+                      Name (A-Z)
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Empty State when no tasks exist */}
-            {activeJobs.length === 0 && (
-              <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center">
-                <StopwatchIllustration />
-                <p className="text-sm font-medium text-[#9e9d96]">
-                  No scheduled tasks yet.
-                </p>
-              </div>
-            )}
-
-            {/* Subtle Wavy Divider */}
-            <WavyDivider />
-
-            {/* 6 Starter Template Cards (2-column layout matching screenshot) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 w-full">
-              {SCHEDULED_STARTERS.map((starter) => {
-                const Icon = starter.icon;
-                return (
-                  <button
-                    key={starter.id}
-                    type="button"
-                    onClick={() => openNewTaskModal(starter)}
-                    className="group relative flex items-start gap-3.5 p-4 rounded-2xl bg-[#201f1c] hover:bg-[#262521] border border-[#302f2b] hover:border-[#42413c] transition-all duration-200 text-left cursor-pointer"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-[#2b2a26] group-hover:bg-[#35342f] flex items-center justify-center shrink-0 text-[#c7c5bc] group-hover:text-white transition-colors mt-0.5">
-                      <Icon size={16} strokeWidth={1.8} />
-                    </div>
-
-                    <div className="flex-1 min-w-0 pr-2">
-                      <h3 className="text-sm font-semibold text-[#f3f2ee] tracking-tight group-hover:text-white transition-colors">
-                        {starter.title}
-                      </h3>
-                      <p className="text-xs text-[#9e9d96] mt-0.5 leading-relaxed">
-                        {starter.desc}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-[11px] text-[#7d7c75] group-hover:text-[#9e9d96] mt-2.5 transition-colors">
-                        <Clock size={11} className="text-[#9e9d96]" />
-                        <span>{starter.schedule}</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+              {/* New task button with Pragna gold styling */}
+              <button
+                onClick={() => openNewTaskModal()}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold gold-gradient-btn hover:opacity-95 active:scale-95 transition-all shadow-sm"
+              >
+                <span>New task</span>
+                <ChevronDown size={13} />
+              </button>
             </div>
           </div>
 
-          {/* New Scheduled Task Modal Dialog */}
-          {modalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div
-                className="relative w-full max-w-lg bg-[#201f1c] border border-[#383733] rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 animate-in fade-in zoom-in-95 duration-200"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between pb-4 border-b border-[#302f2b]">
-                  <div className="flex items-center gap-2">
-                    <Clock size={18} className="text-amber-400" />
-                    <h3 className="text-base font-bold text-white">Create scheduled task</h3>
-                  </div>
-                  <button
-                    onClick={() => setModalOpen(false)}
-                    className="p-1 rounded-full text-[#9e9d96] hover:text-white hover:bg-white/5 transition-colors"
+          {/* Active Tasks List (if tasks exist) */}
+          {activeJobs.length > 0 && (
+            <div className="mb-8 space-y-3">
+              <div className="flex items-center justify-between pb-1">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Your Scheduled Tasks ({filteredTasks.length})
+                </h2>
+                <button onClick={fetchTasks} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <RotateCcw size={11} className={loading ? 'animate-spin text-[#d4af37]' : ''} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {filteredTasks.map((job) => (
+                  <div
+                    key={job.id}
+                    className="p-4 rounded-2xl bg-card hover:bg-muted/40 border border-border hover:border-[#d4af37]/40 shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                   >
-                    <X size={16} />
-                  </button>
-                </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-foreground truncate group-hover:text-[#d4af37] transition-colors">
+                          {job.title || job.prompt.slice(0, 36)}
+                        </span>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${job.status === 'active' ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/25' : 'bg-[#d4af37]/15 text-[#b8860b] dark:text-[#d4af37] border-[#d4af37]/30'}`}>
+                          {job.status === 'active' ? 'Active' : 'Paused'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{job.prompt}</p>
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground/80 pt-0.5">
+                        <span className="flex items-center gap-1 text-foreground/80">
+                          <Clock size={11} className="text-[#d4af37]" />
+                          {job.schedule}
+                        </span>
+                        {job.last_run && (
+                          <span>Last run: {new Date(job.last_run).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
 
-                <form onSubmit={handleCreateTask} className="flex flex-col gap-4 mt-5">
-                  {/* Task Name */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#9e9d96]">
-                      Task Name
-                    </label>
-                    <input
-                      type="text"
-                      value={modalTitle}
-                      onChange={(e) => setModalTitle(e.target.value)}
-                      placeholder="e.g. Daily briefing, Competitor tracking"
-                      className="w-full px-3.5 py-2 text-sm rounded-xl bg-[#171614] border border-[#383733] text-white placeholder:text-[#6a6962] outline-none focus:border-amber-400/50"
-                    />
-                  </div>
-
-                  {/* Task Instructions */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#9e9d96]">
-                      Instructions / Prompt
-                    </label>
-                    <textarea
-                      value={modalPrompt}
-                      onChange={(e) => setModalPrompt(e.target.value)}
-                      rows={3}
-                      placeholder="What should the assistant do on schedule?"
-                      required
-                      className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-[#171614] border border-[#383733] text-white placeholder:text-[#6a6962] outline-none focus:border-amber-400/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Schedule Selector */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#9e9d96]">
-                      Schedule Frequency
-                    </label>
-                    <select
-                      value={modalSchedule}
-                      onChange={(e) => setModalSchedule(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-[#171614] border border-[#383733] text-white outline-none focus:border-amber-400/50 cursor-pointer"
-                    >
-                      <option value="Weekdays at 8:00 AM">Weekdays at 8:00 AM</option>
-                      <option value="Daily at 9:00 AM">Daily at 9:00 AM</option>
-                      <option value="Every Monday at 9:00 AM">Every Monday at 9:00 AM</option>
-                      <option value="Every Friday at 4:00 PM">Every Friday at 4:00 PM</option>
-                      <option value="Every 1 hour">Every 1 hour</option>
-                      <option value="In 30 minutes">In 30 minutes (One-time)</option>
-                    </select>
-                  </div>
-
-                  {/* Delivery Mode */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#9e9d96]">
-                      Delivery Channel
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                       <button
-                        type="button"
-                        onClick={() => setModalDelivery('notification')}
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs transition-all ${
-                          modalDelivery === 'notification'
-                            ? 'bg-amber-400/10 border-amber-400/40 text-amber-300 font-medium'
-                            : 'bg-[#171614] border-[#383733] text-[#9e9d96] hover:text-white'
-                        }`}
+                        onClick={() => handleRunNow(job)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-muted hover:bg-[#d4af37]/20 text-foreground hover:text-[#d4af37] border border-border transition-colors"
+                        title="Run task immediately"
                       >
-                        <Bell size={14} className="shrink-0" />
-                        <div>
-                          <p className="font-semibold text-white">In-app Notification</p>
-                          <p className="text-[10px] text-[#9e9d96]">Popup reminder & log</p>
-                        </div>
+                        <Play size={11} fill="currentColor" />
+                        <span>Run</span>
                       </button>
-
                       <button
-                        type="button"
-                        onClick={() => setModalDelivery('chat')}
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs transition-all ${
-                          modalDelivery === 'chat'
-                            ? 'bg-amber-400/10 border-amber-400/40 text-amber-300 font-medium'
-                            : 'bg-[#171614] border-[#383733] text-[#9e9d96] hover:text-white'
-                        }`}
+                        onClick={() => handleToggleTask(job.id)}
+                        className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        title={job.status === 'active' ? 'Pause schedule' : 'Resume schedule'}
                       >
-                        <MessageSquare size={14} className="shrink-0" />
-                        <div>
-                          <p className="font-semibold text-white">New Chat Thread</p>
-                          <p className="text-[10px] text-[#9e9d96]">Create conversation</p>
-                        </div>
+                        {job.status === 'active' ? <Pause size={13} /> : <Play size={13} />}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTask(job.id, job.title)}
+                        className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Delete scheduled task"
+                      >
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#302f2b] mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setModalOpen(false)}
-                      className="px-4 py-2 rounded-full text-xs font-medium text-[#c7c5bc] hover:bg-white/5 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="px-5 py-2 rounded-full text-xs font-semibold bg-[#ecebe6] text-[#171614] hover:bg-white active:scale-95 transition-all shadow-sm disabled:opacity-50"
-                    >
-                      {submitting ? 'Scheduling...' : 'Create task'}
-                    </button>
-                  </div>
-                </form>
+                ))}
               </div>
             </div>
           )}
+
+          {/* Empty State when no tasks exist */}
+          {activeJobs.length === 0 && (
+            <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center">
+              <StopwatchIllustration />
+              <p className="text-sm font-medium text-muted-foreground">
+                No scheduled tasks yet.
+              </p>
+            </div>
+          )}
+
+          {/* Subtle Wavy Divider */}
+          <WavyDivider />
+
+          {/* 6 Starter Template Cards with Pragna styling */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 w-full">
+            {SCHEDULED_STARTERS.map((starter) => {
+              const Icon = starter.icon;
+              return (
+                <button
+                  key={starter.id}
+                  type="button"
+                  onClick={() => openNewTaskModal(starter)}
+                  className="group relative flex items-start gap-3.5 p-4 rounded-2xl bg-card hover:bg-muted/40 border border-border hover:border-[#d4af37]/45 shadow-sm hover:shadow-[0_4px_20px_rgba(212,175,55,0.12)] transition-all duration-200 text-left cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-muted/70 group-hover:bg-[#d4af37]/15 flex items-center justify-center shrink-0 text-muted-foreground group-hover:text-[#d4af37] border border-border/50 group-hover:border-[#d4af37]/30 transition-colors mt-0.5">
+                    <Icon size={16} strokeWidth={1.8} />
+                  </div>
+
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h3 className="text-sm font-semibold text-foreground tracking-tight group-hover:text-[#d4af37] transition-colors">
+                      {starter.title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      {starter.desc}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/80 group-hover:text-foreground mt-2.5 transition-colors">
+                      <Clock size={11} className="text-[#d4af37]" />
+                      <span>{starter.schedule}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </AppLayout>
-    </AuthGate>
+
+        {/* New Scheduled Task Modal Dialog */}
+        {modalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div
+              className="relative w-full max-w-lg bg-card border border-border rounded-3xl shadow-premium-lg overflow-hidden flex flex-col p-6 animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-[#d4af37]/15 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37]">
+                    <Clock size={16} />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground">Create scheduled task</h3>
+                </div>
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateTask} className="flex flex-col gap-4 mt-5">
+                {/* Task Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Task Name
+                  </label>
+                  <input
+                    type="text"
+                    value={modalTitle}
+                    onChange={(e) => setModalTitle(e.target.value)}
+                    placeholder="e.g. Daily briefing, Competitor tracking"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/40"
+                  />
+                </div>
+
+                {/* Task Instructions */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Instructions / Prompt
+                  </label>
+                  <textarea
+                    value={modalPrompt}
+                    onChange={(e) => setModalPrompt(e.target.value)}
+                    rows={3}
+                    placeholder="What should the assistant do on schedule?"
+                    required
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/40 resize-none"
+                  />
+                </div>
+
+                {/* Schedule Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Schedule Frequency
+                  </label>
+                  <select
+                    value={modalSchedule}
+                    onChange={(e) => setModalSchedule(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-border text-foreground outline-none focus:border-[#d4af37] cursor-pointer"
+                  >
+                    <option value="Weekdays at 8:00 AM">Weekdays at 8:00 AM</option>
+                    <option value="Daily at 9:00 AM">Daily at 9:00 AM</option>
+                    <option value="Every Monday at 9:00 AM">Every Monday at 9:00 AM</option>
+                    <option value="Every Friday at 4:00 PM">Every Friday at 4:00 PM</option>
+                    <option value="Every 1 hour">Every 1 hour</option>
+                    <option value="In 30 minutes">In 30 minutes (One-time)</option>
+                  </select>
+                </div>
+
+                {/* Delivery Mode */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Delivery Channel
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModalDelivery('notification')}
+                      className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs transition-all ${
+                        modalDelivery === 'notification'
+                          ? 'bg-[#d4af37]/15 border-[#d4af37]/50 text-[#d4af37] font-medium'
+                          : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Bell size={14} className="shrink-0 text-[#d4af37]" />
+                      <div>
+                        <p className="font-semibold text-foreground">In-app Notification</p>
+                        <p className="text-[10px] text-muted-foreground">Popup reminder & log</p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setModalDelivery('chat')}
+                      className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs transition-all ${
+                        modalDelivery === 'chat'
+                          ? 'bg-[#d4af37]/15 border-[#d4af37]/50 text-[#d4af37] font-medium'
+                          : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <MessageSquare size={14} className="shrink-0 text-[#d4af37]" />
+                      <div>
+                        <p className="font-semibold text-foreground">New Chat Thread</p>
+                        <p className="text-[10px] text-muted-foreground">Create conversation</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(false)}
+                    className="px-4 py-2 rounded-full text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-5 py-2 rounded-full text-xs font-semibold gold-gradient-btn hover:opacity-95 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+                  >
+                    {submitting ? 'Scheduling...' : 'Create task'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </AppLayout>
   );
 }
