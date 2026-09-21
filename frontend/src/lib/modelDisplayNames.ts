@@ -9,7 +9,7 @@
  * - "Manas" (मनस् — mind/intellect) → Google Gemma 4 31B
  * - "Bṛhat" (बृहत् — vast/immense) → Nvidia Nemotron 120B
  *
- * API calls, OpenRouter slugs, and model IDs stay 100% UNCHANGED.
+ * API calls and model IDs stay 100% UNCHANGED.
  */
 
 export interface SanskritModelConfig {

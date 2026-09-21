@@ -170,7 +170,7 @@ async function manageSkillReal(args: Record<string, any>): Promise<any> {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPLETE AGENT TOOLS SCHEMA (Mimir + Agentic Architecture + Doc Editing + Diagrams)
+// COMPLETE AGENT TOOLS SCHEMA (Agentic Architecture + Doc Editing + Diagrams)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const AGENT_TOOLS_SCHEMA = [

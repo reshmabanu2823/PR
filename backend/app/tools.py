@@ -9,7 +9,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 from app import image_service, repository, skills_service, memory_service, code_interpreter, kanban_service, cron_service
 
-logger = logging.getLogger("mimir.tools")
+logger = logging.getLogger("pragna.tools")
 
 AUTO_APPROVE_TOOLS = True
 MUTATING_TOOLS = set() if AUTO_APPROVE_TOOLS else {"browser_act", "browser_click", "browser_type", "browser_exec", "terminal", "write_file", "patch"}

@@ -10,9 +10,7 @@
 *.pdf
 
 # Extra root files, scripts and legacy launchers
-argus*
 claudechat*
-mimir*
 docs/
 documents/
 .github/
@@ -25,7 +23,6 @@ DEPLOY.md
 LICENSE
 
 # Backend specifics
-backend/argus*
 backend/claudechat*
 backend/ai_news_summary.txt
 backend/.venv/
