@@ -8,7 +8,6 @@ import { useChat } from '@/context/ChatContext';
 import { useAuth } from '@/context/AuthContext';
 import {
   MessageSquare,
-  Folder,
   ChevronRight,
   PanelLeftClose,
   Plus,
@@ -20,7 +19,6 @@ import {
 import UserProfileMenu from '@/components/UserProfileMenu';
 
 const navItems = [
-  { key: 'nav-history', href: '/chat-history-folders', icon: Folder, label: 'Folders & Projects' },
   { key: 'nav-tasks', href: '/tasks', icon: Clock, label: 'Scheduled' },
 ];
 
