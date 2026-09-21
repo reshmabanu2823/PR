@@ -1,5 +1,7 @@
 import base64
 import logging
+import random
+import urllib.parse
 from typing import Any
 import httpx
 
@@ -39,11 +41,14 @@ async def generate_image(prompt: str, api_key: str, aspect_ratio: str = "1:1") -
             logger.error(f"Stability generate error {resp.status_code}: {resp.text[:500]}")
             return {"success": False, "error": _error_from_response(resp)}
         data = resp.json()
+        img_b64 = data.get("image", "")
+        data_url = f"data:image/png;base64,{img_b64}"
         return {
             "success": True,
             "prompt": prompt,
-            "summary": f"Generated an image of: {prompt}",
-            "image_base64": data["image"],
+            "summary": f"Generated an image of: {prompt}\n\n![{prompt}]({data_url})",
+            "image_base64": img_b64,
+            "image_url": data_url,
         }
     except Exception as e:
         logger.error(f"Stability generate exception: {e}")
@@ -72,11 +77,14 @@ async def edit_image(image_base64: str, prompt: str, api_key: str, strength: flo
             logger.error(f"Stability edit error {resp.status_code}: {resp.text[:500]}")
             return {"success": False, "error": _error_from_response(resp)}
         data = resp.json()
+        img_b64 = data.get("image", "")
+        data_url = f"data:image/png;base64,{img_b64}"
         return {
             "success": True,
             "prompt": prompt,
-            "summary": f"Edited the image: {prompt}",
-            "image_base64": data["image"],
+            "summary": f"Edited the image: {prompt}\n\n![{prompt}]({data_url})",
+            "image_base64": img_b64,
+            "image_url": data_url,
         }
     except Exception as e:
         logger.error(f"Stability edit exception: {e}")

@@ -353,7 +353,7 @@ def _tool_text_summary(t_name: str, res: dict) -> str:
     if t_name == "browser_act":
         steps = "; ".join(res.get("executed_steps", [])) or "no steps executed"
         return f"Executed: {steps}. Now at {res.get('current_url', '?')} ({res.get('current_title', '?')})."
-    if t_name in ("generate_image", "edit_image"):
+    if t_name in ("generate_image", "image_generate", "edit_image"):
         # A plain confirmation string, not the raw result dict -- feeding a
         # Python-repr'd dict back as "tool" content (the generic fallback
         # below) visually resembles a ReAct-style action/action_input blob,
@@ -365,7 +365,7 @@ def _tool_text_summary(t_name: str, res: dict) -> str:
 
 def _latest_image_summary(tool_calls_executed: list[dict]) -> str | None:
     for item in reversed(tool_calls_executed):
-        if item["name"] in ("generate_image", "edit_image") and item["result"].get("success"):
+        if item["name"] in ("generate_image", "image_generate", "edit_image") and item["result"].get("success"):
             return item["result"].get("summary")
     return None
 
@@ -520,7 +520,7 @@ async def _run_generation_loop(
 
                 _record_tool_result(ollama_messages, tc, t_name, model, res)
                 tool_calls_executed.append({"name": t_name, "args": t_args, "result": res_for_display})
-                if t_name in ("generate_image", "edit_image"):
+                if t_name in ("generate_image", "image_generate", "edit_image"):
                     used_image_tool_last_round = True
 
     except httpx.HTTPError as err:
