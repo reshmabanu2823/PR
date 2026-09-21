@@ -3,7 +3,7 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   '';
 
-const TOKEN_STORAGE_KEY = 'argus-auth-token';
+const TOKEN_STORAGE_KEY = 'pragna-auth-token';
 let authToken: string | null =
   typeof window !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
 
@@ -453,7 +453,9 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
 export async function fetchMe(): Promise<AuthUser> {
   const response = await fetch(`${API_BASE}/api/auth/me`, { headers: _authHeaders() });
-  if (!response.ok) throw new Error('Not authenticated');
+  if (!response.ok) {
+    throw Object.assign(new Error('Not authenticated'), { status: response.status });
+  }
   return response.json();
 }
 

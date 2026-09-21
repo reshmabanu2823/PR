@@ -28,7 +28,7 @@ def create_user(conn, email: str, password_hash: str, name: str | None = None) -
 def get_user_by_email_or_username(conn, identifier: str) -> dict | None:
     row = conn.execute(
         "SELECT id, email, password_hash, created_at, oauth_provider, oauth_id, name, avatar_url "
-        "FROM users WHERE email = ? OR name = ?",
+        "FROM users WHERE lower(email) = lower(?) OR name = ?",
         (identifier, identifier),
     ).fetchone()
     return dict(row) if row else None
