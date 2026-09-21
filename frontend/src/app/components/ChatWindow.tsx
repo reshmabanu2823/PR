@@ -111,7 +111,7 @@ export default function ChatWindow({
     const summary = [
       conversation.title,
       '',
-      ...conversation.messages.map(m => `${m.role === 'user' ? 'You' : 'Pragna'}: ${m.content}`),
+      ...conversation.messages.map(m => `${m.role === 'user' ? 'You' : 'PRAGNA 1-A'}: ${m.content}`),
     ].join('\n');
 
     if (typeof navigator !== 'undefined' && navigator.share) {
@@ -375,7 +375,7 @@ export default function ChatWindow({
                 const finalMsg = msg.trim() || (docFiles.length > 0 ? `Take a look at ${docFiles.map(f => f.name).join(', ')}.` : msg);
                 onSendMessage(finalMsg, images, undefined, meta?.language, chosenModelId);
               }}
-              placeholder="Reply to Pragna..."
+              placeholder="Reply to PRAGNA 1-A..."
               initialModel={selectedModel?.label || "Tvarā"}
               models={models.map(m => m.label)}
               onModelChange={(modelLabel) => {
@@ -390,7 +390,7 @@ export default function ChatWindow({
               onLanguageChange={onSelectLanguage}
             />
             <p className="text-center text-[0.6875rem] text-muted-foreground/50 mt-2 tracking-wide">
-              Pragna may make mistakes. Verify important information.
+              PRAGNA 1-A may make mistakes. Verify important information.
             </p>
           </div>
         </div>

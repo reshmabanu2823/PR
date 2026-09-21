@@ -411,7 +411,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
   (
     {
       onSubmit,
-      placeholder = "Ask Pragna anything...",
+      placeholder = "Ask PRAGNA 1-A anything...",
       className,
       models = SANSKRIT_MODELS.map((m) => m.displayName),
       efforts = ["Low", "Medium", "Max Effort"],

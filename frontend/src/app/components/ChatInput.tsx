@@ -144,7 +144,7 @@ export default function ChatInput({
           onKeyDown={handleKeyDown}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Ask Pragna anything..."
+          placeholder="Ask PRAGNA 1-A anything..."
           rows={1}
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40
             resize-none outline-none leading-relaxed min-h-[26px] max-h-[200px] py-0.5"

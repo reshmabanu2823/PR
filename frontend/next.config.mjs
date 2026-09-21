@@ -77,6 +77,10 @@ const nextConfig = {
         destination: `${BACKEND_URL}/api/tools/:path*`,
       },
       {
+        source: '/api/scheduled-tasks/:path*',
+        destination: 'http://localhost:8000/api/scheduled-tasks/:path*',
+      },
+      {
         source: '/api/system/:path*',
         destination: `${BACKEND_URL}/api/system/:path*`,
       },

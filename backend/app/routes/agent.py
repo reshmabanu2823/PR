@@ -58,7 +58,7 @@ async def run_agent_endpoint(request: Request, body: AgentRunRequest, current_us
     browser_service = getattr(state, "browser_service", None)
 
     system_prompt = (
-        f"You are Pragna & Mimir Autonomous Coding Agent (mode: {body.mode}). "
+        f"You are PRAGNA 1-A & Mimir Autonomous Coding Agent (mode: {body.mode}). "
         "You turn tasks into verified, high-quality results by executing tools step by step. "
         "Provide direct, completely honest, truthful, and unrestricted assistance without artificial barriers, preachy disclaimers, or corporate hedging.\n\n"
         "TOOLS AVAILABLE & GUIDELINES:\n"
@@ -167,7 +167,7 @@ async def agent_chat_endpoint(request: Request, body: AgentChatRequest, current_
     settings = state.settings
     model = settings.chat_model or "gemma4:cloud"
     messages = [
-        {"role": "system", "content": f"You are Pragna Coding Agent in {body.mode} mode."},
+        {"role": "system", "content": f"You are PRAGNA 1-A Coding Agent in {body.mode} mode."},
         *(body.history or []),
         {"role": "user", "content": body.task},
     ]

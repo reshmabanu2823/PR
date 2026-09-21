@@ -62,7 +62,7 @@ const AppLogo = memo(function AppLogo({
       {imageSrc ? (
         <img
           src={imageSrc}
-          alt="Pragna"
+          alt="PRAGNA 1-A"
           width={width}
           height={height}
           className="flex-shrink-0 object-contain bg-transparent select-none filter drop-shadow-[0_2px_12px_rgba(212,175,55,0.22)]"

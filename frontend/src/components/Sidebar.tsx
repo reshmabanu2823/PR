@@ -22,7 +22,7 @@ import {
 
 const navItems = [
   { key: 'nav-chat', href: '/', icon: MessageSquare, label: 'Chat', showCount: false },
-  { key: 'nav-tasks', href: '/tasks', icon: CalendarClock, label: 'Scheduled Tasks', showCount: false },
+  { key: 'nav-tasks', href: '/tasks', icon: Clock, label: 'Scheduled', showCount: false },
   { key: 'nav-history', href: '/chat-history-folders', icon: Folder, label: 'Folders & Projects', showCount: true },
   { key: 'nav-settings', href: '/settings', icon: Settings, label: 'Settings', showCount: false },
 ];

@@ -53,7 +53,7 @@ export function buildExportContent(
   }
 
   for (const m of conversation.messages) {
-    const speaker = m.role === 'user' ? 'You' : 'Pragna';
+    const speaker = m.role === 'user' ? 'You' : 'PRAGNA 1-A';
     const label = isMarkdown ? `**${speaker}**` : speaker;
     const time = includeTimestamps ? ` (${formatTimestamp(m.timestamp)})` : '';
     lines.push(`${label}${time}:`, m.content, '');

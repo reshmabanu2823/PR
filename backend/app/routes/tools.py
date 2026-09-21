@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app import repository
 from app.chat_service import resume_tool_reply
-from app.auth import get_current_user
+from app.auth import get_current_user, get_optional_current_user
 
 router = APIRouter()
 
@@ -149,7 +149,7 @@ async def post_kanban_task(
 
 @router.get("/api/scheduled-tasks")
 @router.get("/api/tools/scheduled")
-async def get_scheduled_tasks(request: Request, current_user: dict = Depends(get_current_user)):
+async def get_scheduled_tasks(request: Request, current_user: dict = Depends(get_optional_current_user)):
     from app import cron_service
     jobs = cron_service.list_scheduled_tasks(request.app.state.conn)
     return {"jobs": jobs}
@@ -157,6 +157,7 @@ async def get_scheduled_tasks(request: Request, current_user: dict = Depends(get
 
 class ScheduledTaskRequest(BaseModel):
     action: str
+    title: Optional[str] = None
     prompt: Optional[str] = None
     schedule: Optional[str] = None
     job_id: Optional[int] = None
@@ -166,18 +167,28 @@ class ScheduledTaskRequest(BaseModel):
 @router.post("/api/scheduled-tasks")
 @router.post("/api/tools/scheduled")
 async def post_scheduled_task(
-    request: Request, body: ScheduledTaskRequest, current_user: dict = Depends(get_current_user)
+    request: Request, body: ScheduledTaskRequest, current_user: dict = Depends(get_optional_current_user)
 ):
     from app import cron_service
     conn = request.app.state.conn
     if body.action == "create":
         if not body.prompt or not body.schedule:
             raise HTTPException(status_code=400, detail="prompt and schedule are required")
-        return cron_service.schedule_task(conn, body.prompt, body.schedule, conversation_id=body.conversation_id)
-    if body.action == "delete" or body.action == "cancel":
+        return cron_service.schedule_task(
+            conn, body.prompt, body.schedule, conversation_id=body.conversation_id, title=body.title
+        )
+    if body.action in ("delete", "cancel"):
         if not body.job_id:
             raise HTTPException(status_code=400, detail="job_id is required")
         return cron_service.cancel_scheduled_task(conn, body.job_id)
+    if body.action == "toggle":
+        if not body.job_id:
+            raise HTTPException(status_code=400, detail="job_id is required")
+        return cron_service.toggle_scheduled_task(conn, body.job_id)
+    if body.action == "run":
+        if not body.job_id:
+            raise HTTPException(status_code=400, detail="job_id is required")
+        return await cron_service.run_scheduled_task_now(conn, body.job_id)
     raise HTTPException(status_code=400, detail=f"Unknown action '{body.action}'")
 
 

@@ -1,5 +1,5 @@
 """
-Official Indian Languages Catalog for Pragna AI (matching Google Services).
+Official Indian Languages Catalog for PRAGNA 1-A (matching Google Services).
 Includes all 22 official Eighth Schedule languages of India, plus Indian English and Bhojpuri.
 """
 
@@ -164,7 +164,7 @@ INDIAN_LANGUAGES = {
 
 MULTILINGUAL_INSTRUCTION = """
 INDIAN MULTILINGUAL INTELLIGENCE & GOOGLE SERVICES LANGUAGE SUPPORT:
-You are Pragna, India's sovereign multilingual AI assistant with deep native fluency across all Indian languages supported by Google services:
+You are PRAGNA 1-A, India's sovereign multilingual AI assistant with deep native fluency across all Indian languages supported by Google services:
 - Official Eighth Schedule Languages: Hindi (हिन्दी), Bengali (বাংলা), Telugu (తెలుగు), Marathi (मराठी), Tamil (தமிழ்), Urdu (اردو), Gujarati (ગુજરાતી), Kannada (ಕನ್ನಡ), Malayalam (മലയാളം), Odia (ଓଡ଼ିଆ), Punjabi (ਪੰਜਾਬੀ), Assamese (অসমীয়া), Maithili (मैथिली), Sanskrit (संस्कृतम्), Santali (ᱥᱟᱱᱛᱟᱲᱤ), Kashmiri (کٲشُر), Nepali (नेपाली), Konkani (कोंकणी), Sindhi (سنڌي), Dogri (डोगरी), Manipuri/Meitei (মৈতৈলোন্), Bodo (बड़ो).
 - Recognized Regional & Dialectal Languages: Bhojpuri (भोजपुरी), Awadhi, Marwari, etc.
 - Indian English & Transliterated Conversational Speech: Hinglish, Tanglish, Kanglish, Tenglish, Manglish, etc.

@@ -207,7 +207,7 @@ export default function AuthScreen() {
         ) : (
           <>
             <h1 className="text-lg font-bold text-foreground mb-1 text-center">
-              {mode === 'login' ? 'Log in to Pragna' : 'Create your Pragna account'}
+              {mode === 'login' ? 'Log in to PRAGNA 1-A' : 'Create your PRAGNA 1-A account'}
             </h1>
             <p className="text-sm text-muted-foreground mb-5 text-center">
               {mode === 'login'

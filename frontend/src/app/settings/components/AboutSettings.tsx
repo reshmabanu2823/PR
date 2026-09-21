@@ -14,7 +14,7 @@ export default function AboutSettings() {
   return (
     <div className="p-6 max-w-2xl">
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-foreground mb-1">About Pragna</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-1">About PRAGNA 1-A</h2>
         <p className="text-sm text-muted-foreground">Version info, credits, and changelog.</p>
       </div>
       {/* App identity */}
@@ -24,12 +24,12 @@ export default function AboutSettings() {
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-foreground">Pragna</h3>
+            <h3 className="text-base font-bold text-foreground">PRAGNA 1-A</h3>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
               AI
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">Version 1.4.0 — Pragna Gold Edition</p>
+          <p className="text-sm text-muted-foreground">Version 1.4.0 — PRAGNA 1-A Gold Edition</p>
           <p className="text-xs text-muted-foreground mt-1">
             An advanced AI reasoning interface with dark Obsidian and Gold aesthetic.
           </p>

@@ -68,7 +68,7 @@ export default function SharedConversationPage() {
         <AppLogo size={22} variant="shield" />
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{title}</p>
-          <p className="text-xs text-muted-foreground">Shared read-only conversation &bull; Pragna</p>
+          <p className="text-xs text-muted-foreground">Shared read-only conversation &bull; PRAGNA 1-A</p>
         </div>
       </header>
 

@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Folder,
   CalendarClock,
+  Clock,
   LayoutGrid,
   Sun,
   Moon,
@@ -129,7 +130,7 @@ export default function Sidebar({
             <div
               className="flex items-center cursor-pointer select-none py-0.5"
               onClick={onNewConversation}
-              title="Pragna AI - Start new chat"
+              title="PRAGNA 1-A - Start new chat"
             >
               <AppLogo size={30} variant="full" />
             </div>
@@ -168,8 +169,8 @@ export default function Sidebar({
               onClick={() => router.push('/tasks')}
               className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-sidebar-hover transition-all duration-150 group"
             >
-              <CalendarClock size={17} strokeWidth={1.8} className="flex-shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="flex-1 text-left">Scheduled Tasks</span>
+              <Clock size={17} strokeWidth={1.8} className="flex-shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="flex-1 text-left">Scheduled</span>
             </button>
             <button
               onClick={onOpenArtifacts}

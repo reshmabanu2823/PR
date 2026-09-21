@@ -77,7 +77,7 @@ const SLIDES: Slide[] = [
     id: "te",
     frameIndex: 3,
     kind: "lang",
-    title: "ప్రజ్ఞ 1 A",
+    title: "ప్రజ్ఞ 1-A",
     subtitle: "ఒక ప్రాంతీయ చాట్‌బాట్",
     font: "'Noto Sans Telugu', sans-serif",
   },
@@ -85,7 +85,7 @@ const SLIDES: Slide[] = [
     id: "ta",
     frameIndex: 4,
     kind: "lang",
-    title: "பிரக்ஞா 1 A",
+    title: "பிரக்ஞா 1-A",
     subtitle: "ஒரு பிராந்திய சாட்பாட்",
     font: "'Noto Sans Tamil', sans-serif",
   },
@@ -297,7 +297,7 @@ export default function SplashScreen({ visible = true, onDismiss }: SplashScreen
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={PRAGNA_WORDMARK}
-                      alt="PRAGNA-1 A"
+                      alt="PRAGNA 1-A"
                       style={{
                         height: "clamp(22px, 3.6vw, 46px)",
                         width: "auto",

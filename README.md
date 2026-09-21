@@ -1,4 +1,4 @@
-# Pragna
+# PRAGNA 1-A
 
 > Intelligent, high-performance AI workspace and conversational operating environment.
 
@@ -12,9 +12,9 @@
 
 ## Overview
 
-**Pragna** is a full-stack AI platform combining conversational intelligence with real-time artifact visualization, document generation, semantic search, browser exploration, voice synthesis, and dynamic task management.
+**PRAGNA 1-A** is a full-stack AI platform combining conversational intelligence with real-time artifact visualization, document generation, semantic search, browser exploration, voice synthesis, and dynamic task management.
 
-Built for velocity, reliability, and precision, Pragna pairs an ultra-responsive Next.js 15 frontend with a high-concurrency FastAPI engine, SQLite persistence, and ChromaDB vector search.
+Built for velocity, reliability, and precision, PRAGNA 1-A pairs an ultra-responsive Next.js 15 frontend with a high-concurrency FastAPI engine, SQLite persistence, and ChromaDB vector search.
 
 ---
 
@@ -24,14 +24,14 @@ Built for velocity, reliability, and precision, Pragna pairs an ultra-responsive
 
 ```text
 +---------------------------------------------------------------------------------------------------------+
-| [=] Pragna Workspace          [ Model: Gemma-4 / Claude / DeepSeek v ]     (Settings) (Tasks) [User Profile] |
+| [=] PRAGNA 1-A Workspace      [ Model: Gemma-4 / Claude / DeepSeek v ]     (Settings) (Tasks) [User Profile] |
 +------------------+----------------------------------------------------+------------------------------------+
 | SIDEBAR          | CHAT CONVERSATION VIEW                             | ARTIFACT STUDIO                    |
 |                  |                                                    |                                    |
 | [+ New Chat]     |  User:                                             |  [ Code ] [ Preview ] [ Export ]   |
 |                  |  Build an interactive architecture diagram.        |  --------------------------------  |
 | FOLDERS          |                                                    |  flowchart TD                      |
-| > Work           |  Pragna:                                           |    A[Client] --> B[Gateway]        |
+| > Work           |  PRAGNA 1-A:                                       |    A[Client] --> B[Gateway]        |
 | > Research       |  Here is the architecture specification. I have    |    B --> C[(Vector DB)]            |
 | > Drafts         |  rendered the interactive diagram on the right.    |                                    |
 |                  |                                                    |  +------------------------------+  |
@@ -42,7 +42,7 @@ Built for velocity, reliability, and precision, Pragna pairs an ultra-responsive
 |                  |                                                    |  Actions:                          |
 |                  |                                                    |  [ Copy ]  [ Download SVG ]        |
 |                  |  +----------------------------------------------+  |  [ Create Document ]               |
-|                  |  | Message Pragna...                  (Mic) [>] |  |                                    |
+|                  |  | Message PRAGNA 1-A...              (Mic) [>] |  |                                    |
 |                  |  +----------------------------------------------+  |                                    |
 +------------------+----------------------------------------------------+------------------------------------+
 ```
@@ -51,7 +51,7 @@ Built for velocity, reliability, and precision, Pragna pairs an ultra-responsive
 
 ```text
 +---------------------------------------------------------------------------------------------------------+
-| [<- Back to Chat]                     Pragna Task Management Board                      [+ Create Task]  |
+| [<- Back to Chat]                  PRAGNA 1-A Task Management Board                  [+ Create Task]  |
 +-----------------------------------+-----------------------------------+---------------------------------+
 | BACKLOG                           | IN PROGRESS                       | COMPLETED                       |
 +-----------------------------------+-----------------------------------+---------------------------------+
@@ -69,7 +69,7 @@ Built for velocity, reliability, and precision, Pragna pairs an ultra-responsive
 
 ```text
 +-----------------------------------+
-| [=] Pragna               (Avatar) |
+| [=] PRAGNA 1-A           (Avatar) |
 +-----------------------------------+
 | Assistant:                        |
 | Retrieval complete. 3 sources     |
@@ -166,7 +166,7 @@ flowchart LR
 
 ## How It's Built
 
-Pragna is engineered as a decoupled, modern multi-service architecture prioritizing speed, developer ergonomics, and rock-solid reliability.
+PRAGNA 1-A is engineered as a decoupled, modern multi-service architecture prioritizing speed, developer ergonomics, and rock-solid reliability.
 
 ```mermaid
 flowchart TD

@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="ml-2 flex items-center gap-1.5">
             <AppLogo size={20} variant="shield" />
-            <span className="font-bold text-sm text-foreground">Pragna</span>
+            <span className="font-bold text-sm text-foreground">PRAGNA 1-A</span>
           </div>
         </div>
         <main className="flex-1 min-w-0 overflow-hidden flex flex-col">{children}</main>

@@ -13,7 +13,7 @@ export default function InputDemoPage() {
           className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-background/70 hover:bg-background/90 text-foreground text-xs font-medium backdrop-blur-md border border-border shadow-sm transition-all"
         >
           <ArrowLeft size={14} />
-          Back to Pragna Chat
+          Back to PRAGNA 1-A Chat
         </Link>
       </div>
       <Demo />

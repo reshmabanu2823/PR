@@ -127,7 +127,7 @@ export default function EmptyState({
               const finalMsg = msg.trim() || (docFiles.length > 0 ? `Take a look at ${docFiles.map(f => f.name).join(', ')}.` : msg);
               onSendMessage(finalMsg, images, sources.length > 0 ? sources : undefined, meta?.language, chosenModelId);
             }}
-            placeholder="Ask Pragna anything..."
+            placeholder="Ask PRAGNA 1-A anything..."
             initialModel={selectedModel?.label || "Tvarā"}
             models={models.map(m => m.label)}
             onModelChange={(modelLabel) => {
@@ -144,7 +144,7 @@ export default function EmptyState({
         </div>
 
         <p className="text-center text-[0.6875rem] text-muted-foreground/40 tracking-wider">
-          Pragna may make mistakes. Verify important information.
+          PRAGNA 1-A may make mistakes. Verify important information.
         </p>
       </div>
     </div>

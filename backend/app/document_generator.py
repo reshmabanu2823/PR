@@ -77,7 +77,7 @@ class NumberedCanvas(canvas.Canvas):
 
         page_str = f"Page {self._pageNumber} of {page_count}"
         self.drawRightString(letter[0] - 40, 20, page_str)
-        self.drawString(40, 20, "Pragna Document Intelligence")
+        self.drawString(40, 20, "PRAGNA 1-A Document Intelligence")
         self.restoreState()
 
 
@@ -467,7 +467,7 @@ def _build_docx(structure, filepath):
     title_p.paragraph_format.space_before = Pt(0)
 
     sub_p = doc.add_paragraph()
-    sub_run = sub_p.add_run("Generated with Pragna Document Intelligence Engine")
+    sub_run = sub_p.add_run("Generated with PRAGNA 1-A Document Intelligence Engine")
     sub_run.font.name = "Arial"
     sub_run.font.size = Pt(9)
     sub_run.font.color.rgb = RGBColor(100, 116, 139)
@@ -1238,7 +1238,7 @@ def _build_pptx(structure, filepath, slides=None):
         title_slide = prs.slides.add_slide(prs.slide_layouts[0])
         title_slide.shapes.title.text = structure.get("title") or "Presentation"
         if len(title_slide.placeholders) > 1:
-            title_slide.placeholders[1].text = "Pragna Document Intelligence Presentation"
+            title_slide.placeholders[1].text = "PRAGNA 1-A Document Intelligence Presentation"
 
         for sec in structure.get("sections", []):
             slide = prs.slides.add_slide(prs.slide_layouts[1])
@@ -1585,7 +1585,7 @@ def _handle_ipc(payload):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Pragna Document Generation and Editing Engine")
+    parser = argparse.ArgumentParser(description="PRAGNA 1-A Document Generation and Editing Engine")
     parser.add_argument("--json", help="JSON payload string")
     parser.add_argument("--stdin", action="store_true", help="Read JSON payload from stdin")
     args = parser.parse_args()
@@ -1611,7 +1611,7 @@ def main():
             print(json.dumps({"success": False, "error": str(e)}))
             sys.exit(1)
 
-    print(json.dumps({"success": True, "message": "Pragna Document Engine ready"}))
+    print(json.dumps({"success": True, "message": "PRAGNA 1-A Document Engine ready"}))
 
 
 if __name__ == "__main__":

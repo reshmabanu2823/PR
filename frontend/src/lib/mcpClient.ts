@@ -66,7 +66,7 @@ function toExposedName(serverName: string, toolName: string): string {
 }
 
 async function connectServer(config: McpServerConfig): Promise<ConnectedServer> {
-  const client = new Client({ name: 'pragna', version: '1.0.0' });
+  const client = new Client({ name: 'PRAGNA 1-A', version: '1.0.0' });
   try {
     if (config.transport === 'stdio') {
       if (!config.command) throw new Error('stdio server config is missing "command"');
