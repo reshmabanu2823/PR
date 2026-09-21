@@ -55,6 +55,12 @@ Voice, Tone & Personality (PRAGNA 1-A Standard):
     \`\`\`
   - For \`language="html"\` artifacts specifically, write a complete, self-contained HTML document (starting with <!DOCTYPE html>, with inline CSS/JS) for a live interactive preview.
 - Standard Code Blocks: For short code snippets (≤20 lines), terminal commands, or examples in explanations, use standard markdown code blocks.
+- Media & Image Generation Capabilities:
+  - You HAVE full, active AI image generation capabilities (powered by FLUX and Stability AI).
+  - When the user asks you to generate, create, draw, make, or visualize an image or picture:
+    - NEVER state or imply that you cannot generate or render images.
+    - NEVER suggest external tools like Midjourney or DALL-E instead of producing the image.
+    - ALWAYS present the generated image directly using markdown image syntax: ![Descriptive Title](image_url).
 - Document Download Links: Document tools (create_word_document, create_pdf_document, create_spreadsheet, create_presentation) return a \`download_url\` field — ALWAYS use that exact value verbatim as the link target: [Download DocumentName.ext](download_url). Never invent or guess a different link path.
 - Editing Existing Files: If the user asks to change, add to, or fix a document/spreadsheet/presentation you already created in this conversation, call the matching edit_* tool (edit_word_document, edit_spreadsheet) with \`path\` set to the exact \`download_url\` string that the earlier create_* tool result returned — do not create a new file for an edit request.
 - Diagrams: When generating architectural or flow diagrams, use Mermaid blocks (\`\`\`mermaid).
@@ -551,6 +557,55 @@ async function detectAndExecuteWebSearch(messages: any[]): Promise<{ query: stri
   }
 }
 
+async function detectAndExecuteImageGeneration(messages: any[]): Promise<{ prompt: string; imageUrl: string; markdown: string } | null> {
+  if (!messages || messages.length === 0) return null;
+  const lastMsg = (messages[messages.length - 1]?.content || '').trim();
+  if (!lastMsg) return null;
+
+  // Check for image generation phrases
+  const isImageRequest = /\b(generate|create|draw|make|render|paint|produce|give me|show me)\b.*\b(image|picture|photo|illustration|drawing|painting|artwork|graphic|portrait|wallpaper|sketch)\b/i.test(lastMsg)
+    || /\b(image|picture|photo|illustration|drawing|painting)\s+of\b/i.test(lastMsg)
+    || /^draw\s+/i.test(lastMsg);
+
+  // Exclude requests to write code or generic file queries
+  const isCodingRequest = /\b(write|create|implement)\s+(?:a\s+)?(?:python|javascript|typescript|c\+\+|html|css|component|function|api|endpoint|sql|script)\b/i.test(lastMsg);
+  if (isCodingRequest && !/\b(image|photo|picture)\b/i.test(lastMsg)) return null;
+
+  if (!isImageRequest) return null;
+
+  // Extract clean prompt
+  let prompt = lastMsg
+    .replace(/\b(can you|could you|please|kindly|i want you to|help me|generate me|generate|create me|create|draw me|draw|make me|make|render me|render|paint me|paint|produce|give me|show me)\b/gi, ' ')
+    .replace(/\b(an?|the|some)?\s*(image|picture|photo|illustration|drawing|painting|artwork|graphic|portrait|wallpaper|sketch)\s*(of|for|about|with|depicting|showing)?\b/gi, ' ')
+    .replace(/[?!,.:;"]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!prompt || prompt.length < 2) {
+    prompt = lastMsg;
+  }
+
+  let aspectRatio = '1:1';
+  if (/\b(16:9|widescreen|landscape|horizontal|desktop)\b/i.test(lastMsg)) aspectRatio = '16:9';
+  else if (/\b(9:16|portrait|vertical|mobile|phone|story)\b/i.test(lastMsg)) aspectRatio = '9:16';
+  else if (/\b(4:3)\b/i.test(lastMsg)) aspectRatio = '4:3';
+  else if (/\b(3:4)\b/i.test(lastMsg)) aspectRatio = '3:4';
+
+  try {
+    const res = await executeTool('image_generate', { prompt, aspect_ratio: aspectRatio });
+    if (res && res.imageUrl) {
+      return {
+        prompt,
+        imageUrl: res.imageUrl,
+        markdown: `![${prompt}](${res.imageUrl})`,
+      };
+    }
+  } catch (err) {
+    console.warn('detectAndExecuteImageGeneration error:', err);
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const incomingAuth = req.headers.get('authorization') || '';
@@ -710,6 +765,15 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
           content: `[VERIFIED REAL-TIME LIVE SEARCH RESULTS for "${autoSearch.query}"]:\n${autoSearch.resultsText}\n\nINSTRUCTION: Answer the user's inquiry directly, accurately, and honestly using these real-time search results. State the facts clearly without preamble or unnecessary disclaimers. If the search results conflict with your own pre-trained memory or knowledge cutoff, the search results win.`,
         });
       }
+    }
+
+    // Direct Image Generation resolution
+    const autoImage = await detectAndExecuteImageGeneration(messages);
+    if (autoImage) {
+      conversationHistory.push({
+        role: 'system',
+        content: `[VERIFIED IMAGE GENERATION RESULT for "${autoImage.prompt}"]:\nAn image has been successfully generated for the user's request.\n\nImage Markdown Embed:\n${autoImage.markdown}\n\nCRITICAL INSTRUCTIONS:\n- You MUST include this EXACT image markdown in your reply:\n${autoImage.markdown}\n- Briefly introduce and describe the image in a sentence or two.\n- Do NOT output generic disclaimers or say you cannot generate images.`,
+      });
     }
 
     // Source-grounded retrieval (NotebookLM-style): if the user attached
@@ -1097,6 +1161,9 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
           console.error('Agent loop error:', err);
           sendText(`\n\n*(Error: ${err.message || 'Unknown error'})*\n`);
         } finally {
+          if (autoImage && (!assistantResponseText.includes(autoImage.imageUrl) && !assistantResponseText.includes('!['))) {
+            sendText(`\n\n${autoImage.markdown}\n`);
+          }
           if (ragCitations.length > 0) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ citations: ragCitations })}\n\n`));
           }
