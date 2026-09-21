@@ -226,6 +226,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs (
     conversation_id TEXT,
     created_at TEXT NOT NULL
 );
+ALTER TABLE scheduled_jobs ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE scheduled_jobs ADD COLUMN IF NOT EXISTS last_run TEXT;
 CREATE TABLE IF NOT EXISTS shared_conversations (
     token TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -368,7 +370,21 @@ def get_pg_pool(database_url: str) -> Any:
             conninfo=database_url,
             min_size=1,
             max_size=5,
-            kwargs={"autocommit": True, "sslmode": "require"},
+            # Supabase's pooler drops idle connections. Validate a connection before handing it out,
+            # recycle idle ones before the server does, and fail fast instead of blocking the
+            # event loop for the default 30s pool timeout.
+            check=ConnectionPool.check_connection,
+            max_idle=60,
+            timeout=10,
+            kwargs={
+                "autocommit": True,
+                "sslmode": "require",
+                "connect_timeout": 10,
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 3,
+            },
             open=True,
         )
     return _pool_cache[database_url]
