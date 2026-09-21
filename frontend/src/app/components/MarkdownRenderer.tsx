@@ -89,22 +89,36 @@ export default function MarkdownRenderer({ content, onOpenArtifact }: MarkdownRe
         },
 
         // Images & Media
-        img: ({ src, alt }) => (
-          <span className="block my-3 rounded-xl overflow-hidden border border-border/50 bg-card/60 shadow-md">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src || ''}
-              alt={alt || 'Generated image'}
-              className="w-full max-h-[520px] object-contain rounded-lg mx-auto bg-black/20"
-              loading="lazy"
-            />
-            {alt && (
-              <span className="block text-xs text-muted-foreground px-3.5 py-2 border-t border-border/30 bg-muted/20 font-mono">
-                {alt}
-              </span>
-            )}
-          </span>
-        ),
+        img: ({ src, alt }) => {
+          const rawSrc = src || '';
+          const proxiedSrc = rawSrc.startsWith('http://') || rawSrc.startsWith('https://')
+            ? `/api/image-proxy?url=${encodeURIComponent(rawSrc)}`
+            : rawSrc;
+
+          return (
+            <span className="block my-3 rounded-xl overflow-hidden border border-border/50 bg-card/60 shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={proxiedSrc}
+                alt={alt || 'Generated image'}
+                className="w-full max-h-[520px] object-contain rounded-lg mx-auto bg-black/20"
+                loading="eager"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  // If proxied failed, try direct src or vice-versa
+                  if (rawSrc && target.src.includes('/api/image-proxy')) {
+                    target.src = rawSrc;
+                  }
+                }}
+              />
+              {alt && (
+                <span className="block text-xs text-muted-foreground px-3.5 py-2 border-t border-border/30 bg-muted/20 font-mono">
+                  {alt}
+                </span>
+              )}
+            </span>
+          );
+        },
 
         // Inline code
         code: ({ children, className }) => {
