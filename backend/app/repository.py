@@ -356,35 +356,39 @@ def list_artifacts_for_message(conn, message_id: int) -> list[dict]:
 
 # --- Memories Repository ---
 
-def create_memory(conn, content: str, source_conversation_id: int | None = None) -> int:
+def create_memory(
+    conn, content: str, source_conversation_id: int | None = None, user_id: int | None = None
+) -> int:
     cur = conn.execute(
         """
-        INSERT INTO memories (content, created_at, source_conversation_id)
-        VALUES (?, ?, ?)
+        INSERT INTO memories (content, created_at, source_conversation_id, user_id)
+        VALUES (?, ?, ?, ?)
         """,
-        (content, _now(), source_conversation_id),
+        (content, _now(), source_conversation_id, user_id),
     )
     conn.commit()
     return cur.lastrowid
 
 
-def get_memory(conn, memory_id: int) -> dict | None:
+def get_memory(conn, memory_id: int, user_id: int) -> dict | None:
     row = conn.execute(
-        "SELECT id, content, created_at, source_conversation_id FROM memories WHERE id = ?",
-        (memory_id,),
+        "SELECT id, content, created_at, source_conversation_id FROM memories WHERE id = ? AND user_id = ?",
+        (memory_id, user_id),
     ).fetchone()
     return dict(row) if row else None
 
 
-def list_memories(conn) -> list[dict]:
+def list_memories(conn, user_id: int) -> list[dict]:
     rows = conn.execute(
-        "SELECT id, content, created_at, source_conversation_id FROM memories ORDER BY created_at DESC"
+        "SELECT id, content, created_at, source_conversation_id FROM memories "
+        "WHERE user_id = ? ORDER BY created_at DESC, id DESC",
+        (user_id,),
     ).fetchall()
     return [dict(r) for r in rows]
 
 
-def delete_memory(conn, memory_id: int) -> bool:
-    cur = conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+def delete_memory(conn, memory_id: int, user_id: int) -> bool:
+    cur = conn.execute("DELETE FROM memories WHERE id = ? AND user_id = ?", (memory_id, user_id))
     conn.commit()
     return cur.rowcount > 0
 

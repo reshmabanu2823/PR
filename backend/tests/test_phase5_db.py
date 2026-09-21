@@ -33,17 +33,17 @@ def test_memories_crud(tmp_path):
     conn = make_conn(tmp_path)
     cid = repository.create_conversation(conn, "Test Memory", 1)
 
-    mem_id = repository.create_memory(conn, "User prefers dark mode.", source_conversation_id=cid)
+    mem_id = repository.create_memory(conn, "User prefers dark mode.", source_conversation_id=cid, user_id=1)
     assert mem_id is not None
 
-    mems = repository.list_memories(conn)
+    mems = repository.list_memories(conn, 1)
     assert len(mems) == 1
     assert mems[0]["content"] == "User prefers dark mode."
     assert mems[0]["source_conversation_id"] == cid
 
-    deleted = repository.delete_memory(conn, mem_id)
+    deleted = repository.delete_memory(conn, mem_id, 1)
     assert deleted is True
-    assert len(repository.list_memories(conn)) == 0
+    assert len(repository.list_memories(conn, 1)) == 0
 
 
 def test_tool_calls_crud(tmp_path):

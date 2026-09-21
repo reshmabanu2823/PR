@@ -157,244 +157,127 @@ function queryNeedsTools(messages: any[]): boolean {
   return triggers.some(t => last.includes(t));
 }
 
-function getMemoryFilePaths(): string[] {
-  const baseDir = process.cwd().endsWith('frontend')
-    ? process.cwd()
-    : path.join(process.cwd(), 'frontend');
-  return [path.join(baseDir, 'data', 'memories.json')];
-}
+// ── Per-user memory ──────────────────────────────────────────────────────────
+// Memories live in the backend database and are scoped to the logged-in user by their auth token.
+// Nothing is kept in a shared file, so one user's facts can never reach another user's prompt.
+const BACKEND_URL = 'http://localhost:8000';
+const MEMORY_CACHE_TTL_MS = 30_000;
+const MEMORY_CACHE_MAX_USERS = 200;
+const _memoryCache = new Map<string, { at: number; items: string[] }>();
 
-// In-process memory cache to avoid reading memories.json on every single request
-let _memoriesCache: { userName: string; userNickname: string; memories: string[] } | null = null;
-let _memoriesCacheAge = 0;
-const CACHE_TTL_MS = 5000; // refresh from disk every 5 seconds max
-
-function loadMemoriesSync(): { userName: string; userNickname: string; memories: string[] } {
-  const now = Date.now();
-  if (_memoriesCache && (now - _memoriesCacheAge) < CACHE_TTL_MS) {
-    return _memoriesCache;
-  }
-  const defaultData = {
-    userName: 'Kishore',
-    userNickname: '',
-    memories: ["User's name is Kishore."],
-  };
-  for (const filePath of getMemoryFilePaths()) {
-    try {
-      if (fs.existsSync(filePath)) {
-        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        const result = { ...defaultData, ...parsed };
-        if (result.userName && result.userName.toLowerCase() === 'vinay') {
-          result.userName = 'Kishore';
-        }
-        if (Array.isArray(parsed.memories) && parsed.memories.length > 0) {
-          result.memories = parsed.memories.filter((m: string) => !m.toLowerCase().includes("user's name is vinay"));
-        }
-        if (!result.memories.some((m: string) => m.toLowerCase().includes("user's name is"))) {
-          result.memories.unshift(`User's name is ${result.userName}.`);
-        }
-        _memoriesCache = result;
-        _memoriesCacheAge = now;
-        return result;
-      }
-    } catch {}
-  }
-  _memoriesCache = defaultData;
-  _memoriesCacheAge = now;
-  return defaultData;
-}
-
-// Async: refresh backend SQLite memories into the file cache (runs in background after response starts)
-async function refreshMemoriesFromBackend(): Promise<void> {
+// The caller's own memories, newest first. Anonymous requests have none.
+async function loadUserMemories(authToken?: string): Promise<string[]> {
+  if (!authToken) return [];
+  const cached = _memoryCache.get(authToken);
+  if (cached && Date.now() - cached.at < MEMORY_CACHE_TTL_MS) return cached.items;
   try {
-    const res = await fetch('http://localhost:8000/api/memories', {
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(1500),
+    const res = await fetch(`${BACKEND_URL}/api/memories`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+      signal: AbortSignal.timeout(3000),
     });
-    if (!res.ok) return;
-    const backendMemories = await res.json();
-    if (!Array.isArray(backendMemories)) return;
-
-    const current = loadMemoriesSync();
-    let changed = false;
-    for (const item of backendMemories) {
-      if (item.content && !current.memories.includes(item.content)) {
-        current.memories.push(item.content);
-        changed = true;
-      }
-      // Pull nickname from backend memories too
-      if (!current.userNickname && item.content) {
-        const m = item.content.match(/User's nickname is\s+([^.]+)/i);
-        if (m) { current.userNickname = m[1].trim(); changed = true; }
-      }
+    if (!res.ok) return cached?.items ?? [];
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return cached?.items ?? [];
+    const items = rows
+      .map((r: any) => r?.content)
+      .filter((c: any): c is string => typeof c === 'string' && c.trim().length > 0);
+    if (_memoryCache.size >= MEMORY_CACHE_MAX_USERS) {
+      _memoryCache.delete(_memoryCache.keys().next().value as string);
     }
-    if (changed) {
-      _memoriesCache = current;
-      _memoriesCacheAge = Date.now();
-      // Persist back to disk
-      for (const filePath of getMemoryFilePaths()) {
-        try {
-          const dir = path.dirname(filePath);
-          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(filePath, JSON.stringify(current, null, 2), 'utf-8');
-        } catch {}
-      }
-    }
-  } catch {}
+    _memoryCache.set(authToken, { at: Date.now(), items });
+    return items;
+  } catch {
+    return cached?.items ?? [];
+  }
 }
 
-function getPersistentMemories(customUserName?: string, customUserNickname?: string): { userName: string; userNickname: string; promptBlock: string } {
-  const data = loadMemoriesSync();
-  const userName = (customUserName && customUserName.toLowerCase() !== 'vinay')
-    ? customUserName
-    : (data.userName && data.userName.toLowerCase() !== 'vinay' ? data.userName : 'Kishore');
-  let userNickname = customUserNickname || data.userNickname;
+const NOT_A_NAME = new Set([
+  'a', 'an', 'the', 'here', 'just', 'trying', 'working', 'looking', 'sorry', 'fine', 'good', 'happy',
+  'busy', 'online', 'curious', 'not', 'asking', 'thinking', 'pragna', 'claude', 'assistant', 'bot',
+]);
 
-  // Filter out any stale memories with conflicting names
-  const validMemories = (data.memories || []).filter((m) => {
-    const nameMatch = m.match(/User's name is\s+([^.]+)/i);
-    if (nameMatch) {
-      return nameMatch[1].trim().toLowerCase() === userName.toLowerCase();
+// Durable facts the user states about themselves in this message (name, nickname, notes, place).
+function extractMemoryFacts(content: string): string[] {
+  const facts: string[] = [];
+  if (!content) return facts;
+  const capitalize = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
+  const nick = content.match(/\b(?:my nickname is|nickname is|my nick is|call me nickname|call me)\s+["']?([A-Za-z0-9_-]{2,30})["']?\b/i);
+  if (nick && !NOT_A_NAME.has(nick[1].trim().toLowerCase())) {
+    facts.push(`User's nickname is ${capitalize(nick[1].trim())}.`);
+  }
+
+  const name = content.match(/\b(?:my name is|i am|i'm)\s+([A-Za-z]{2,20})\b/i);
+  if (name && !NOT_A_NAME.has(name[1].trim().toLowerCase())) {
+    facts.push(`User's name is ${capitalize(name[1].trim())}.`);
+  }
+
+  const remember = content.match(/\b(?:remember that|please remember|note that|keep in mind that)\s+(.{4,120})/i);
+  if (remember) {
+    facts.push(`User note: ${remember[1].trim().replace(/[.!?]+$/, '')}.`);
+  }
+
+  const place = content.match(/\b(?:i live in|i am from|i'm from)\s+([^.,\n!]{2,50})/i);
+  if (place) {
+    facts.push(`User is from ${place[1].trim()}.`);
+  }
+  return facts;
+}
+
+// Saves new facts to the caller's own memory. Runs in the background; the backend skips duplicates.
+async function saveMemoryFacts(facts: string[], known: string[], authToken?: string): Promise<void> {
+  if (!authToken) return;
+  const fresh = facts.filter((f) => !known.includes(f));
+  if (fresh.length === 0) return;
+  await Promise.all(
+    fresh.map((content) =>
+      fetch(`${BACKEND_URL}/api/memories`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {})
+    )
+  );
+  _memoryCache.delete(authToken);
+}
+
+// `memories` must be newest first, so the first match is the latest thing the user told us.
+function buildMemoryPrompt(
+  accountName: string | undefined,
+  nicknameOverride: string | undefined,
+  memories: string[]
+): { userName: string; userNickname: string; promptBlock: string } {
+  const lookup = (re: RegExp): string => {
+    for (const m of memories) {
+      const hit = m.match(re);
+      if (hit) return hit[1].trim();
     }
-    return true;
+    return '';
+  };
+  const userName = lookup(/User's name is\s+([^.]+)/i) || accountName || '';
+  const userNickname = nicknameOverride || lookup(/User's nickname is\s+([^.]+)/i);
+
+  // Drop superseded name facts so the prompt never states two different names.
+  const facts = memories.filter((m) => {
+    const hit = m.match(/User's name is\s+([^.]+)/i);
+    return !hit || hit[1].trim().toLowerCase() === userName.toLowerCase();
   });
+  if (!userName && !userNickname && facts.length === 0) return { userName, userNickname, promptBlock: '' };
 
-  if (!validMemories.some((m) => m.toLowerCase().includes(`user's name is ${userName.toLowerCase()}`))) {
-    validMemories.unshift(`User's name is ${userName}.`);
-  }
-
-  // Pull nickname from memory facts if not set
-  if (!userNickname) {
-    for (const m of validMemories) {
-      const nickMatch = m.match(/User's nickname is\s+([^.]+)/i);
-      if (nickMatch) { userNickname = nickMatch[1].trim(); break; }
-    }
-  }
-
-  const memoryLines = validMemories.map(m => `  • ${m}`).join('\n');
+  const who = userName || 'the user';
+  const memoryLines = facts.map((m) => `  • ${m}`).join('\n');
   const promptBlock = `\n\nUSER IDENTITY & PERSISTENT MEMORY (Always active across all conversations & tabs):
-- User's Real/Given Name: ${userName}
+${userName ? `- User's Real/Given Name: ${userName}` : ''}
 ${userNickname ? `- User's Nickname: ${userNickname}` : ''}
 - CRITICAL INSTRUCTIONS REGARDING USER IDENTITY & MEMORY:
-  1. User's Real/Given Name: ${userName}. When the user asks "what is my name", "who am I", or asks for their identity, you MUST check this identity record and state clearly, directly, and accurately that their name is ${userName}.
+  1. ${userName ? `User's Real/Given Name: ${userName}. When the user asks "what is my name", "who am I", or asks for their identity, you MUST check this identity record and state clearly, directly, and accurately that their name is ${userName}` : 'The user has not told you their name yet. If they ask what their name is, say you do not know it yet.'}
   2. User's Nickname: ${userNickname ? `The user's established nickname is strictly "${userNickname}". State it accurately.` : 'No separate nickname set.'}
-  3. Durable facts you remember about ${userName}:
+  3. Durable facts you remember about ${who}:
 ${memoryLines}
-  4. NEVER confuse your name (PRAGNA 1-A) with the user's name (${userName}).`;
+  4. NEVER confuse your name (PRAGNA 1-A) with the user's name${userName ? ` (${userName})` : ''}.`;
 
   return { userName, userNickname, promptBlock };
-}
-
-
-function updateMemoriesFromMessage(content: string, currentUserName?: string) {
-  if (!content) return;
-  const targetPaths = getMemoryFilePaths();
-  const effectiveName = (currentUserName && currentUserName.toLowerCase() !== 'vinay') ? currentUserName : 'Kishore';
-  let data = {
-    userName: effectiveName,
-    userNickname: '',
-    memories: [`User's name is ${effectiveName}.`]
-  };
-
-  for (const filePath of targetPaths) {
-    try {
-      if (fs.existsSync(filePath)) {
-        const loaded = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        data = { ...data, ...loaded };
-        if (data.userName && data.userName.toLowerCase() === 'vinay') {
-          data.userName = effectiveName;
-        }
-        if (Array.isArray(loaded.memories)) {
-          data.memories = loaded.memories.filter((m: string) => !m.toLowerCase().includes("user's name is vinay"));
-        }
-        break;
-      }
-    } catch (e) {}
-  }
-
-  let changed = false;
-  const newFactsToSync: string[] = [];
-
-  // Check for nickname extraction
-  const nickMatch = content.match(/\b(?:my nickname is|nickname is|my nick is|call me nickname|call me)\s+["']?([A-Za-z0-9_-]{2,30})["']?\b/i);
-  if (nickMatch) {
-    const candidate = nickMatch[1].trim();
-    const invalid = ['a', 'an', 'the', 'here', 'just', 'trying', 'working', 'looking', 'sorry', 'fine', 'good', 'happy', 'busy', 'online', 'curious', 'not', 'asking', 'thinking', 'pragna', 'claude', 'assistant', 'bot', 'vinay'];
-    if (!invalid.includes(candidate.toLowerCase())) {
-      const formatted = candidate.charAt(0).toUpperCase() + candidate.slice(1);
-      data.userNickname = formatted;
-      const fact = `User's nickname is ${formatted}.`;
-      if (!data.memories.includes(fact)) {
-        data.memories.unshift(fact);
-        newFactsToSync.push(fact);
-      }
-      changed = true;
-    }
-  }
-
-  // Check for name extraction
-  const nameMatch = content.match(/\b(?:my name is|i am|i'm)\s+([A-Za-z]{2,20})\b/i);
-  if (nameMatch) {
-    const candidate = nameMatch[1].trim();
-    const invalid = ['a', 'an', 'the', 'here', 'just', 'trying', 'working', 'looking', 'sorry', 'fine', 'good', 'happy', 'busy', 'online', 'curious', 'not', 'asking', 'thinking', 'pragna', 'claude', 'assistant', 'bot'];
-    if (!invalid.includes(candidate.toLowerCase())) {
-      const formatted = candidate.charAt(0).toUpperCase() + candidate.slice(1);
-      data.userName = formatted;
-      const fact = `User's name is ${formatted}.`;
-      if (!data.memories.includes(fact)) {
-        data.memories.unshift(fact);
-        newFactsToSync.push(fact);
-      }
-      changed = true;
-    }
-  }
-
-  // Check for remember directives
-  const remMatch = content.match(/\b(?:remember that|please remember|note that|keep in mind that)\s+(.{4,120})/i);
-  if (remMatch) {
-    const fact = remMatch[1].trim().replace(/[.!?]+$/, '');
-    const entry = `User note: ${fact}.`;
-    if (!data.memories.includes(entry)) {
-      data.memories.push(entry);
-      newFactsToSync.push(entry);
-      changed = true;
-    }
-  }
-
-  // Check for preferences
-  const prefMatch = content.match(/\b(?:i live in|i am from|i'm from)\s+([^.,\n!]{2,50})/i);
-  if (prefMatch) {
-    const place = prefMatch[1].trim();
-    const entry = `User is from ${place}.`;
-    if (!data.memories.includes(entry)) {
-      data.memories.push(entry);
-      newFactsToSync.push(entry);
-      changed = true;
-    }
-  }
-
-  if (changed) {
-    for (const filePath of targetPaths) {
-      try {
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-      } catch (e) {
-        console.error('Error saving memories.json to', filePath, e);
-      }
-    }
-    // Invalidate in-process cache so next request reloads fresh data
-    _memoriesCache = null;
-
-    // Sync new facts to backend SQLite asynchronously
-    for (const fact of newFactsToSync) {
-      fetch('http://localhost:8000/api/memories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: fact }),
-      }).catch(() => {});
-    }
-  }
 }
 
 
@@ -560,17 +443,21 @@ export async function POST(req: NextRequest) {
     } = body;
 
 
-    // Inspect user's last message for durable facts to persist
+    // Memories are per user: read and written with the caller's own token, never from a shared file.
     const lastUserMessage = messages[messages.length - 1]?.content || '';
-    updateMemoriesFromMessage(lastUserMessage, clientUserName);
-
-    // Backend SQLite is the shared memory store: pull it first so every model,
-    // on every request, sees the same facts.
-    // Fire and forget: the backend round trip (~1s) must not delay the reply. New backend facts show up on the next request.
-    void refreshMemoriesFromBackend();
-    const { userName: resolvedUserName, userNickname: resolvedUserNickname, promptBlock } = getPersistentMemories(clientUserName, body.userNickname);
+    const newMemoryFacts = extractMemoryFacts(lastUserMessage);
+    const storedMemoriesPromise = loadUserMemories(userAuthToken);
     const targetModel = resolveOllamaModel(model);
     const hasImages = messages.some((m: any) => Array.isArray(m.images) && m.images.length > 0);
+    // Start the web search now so it overlaps with the memory lookup and document retrieval.
+    const searchPromise = hasImages ? Promise.resolve(null) : detectAndExecuteWebSearch(messages).catch(() => null);
+    const storedMemories = await storedMemoriesPromise;
+    void saveMemoryFacts(newMemoryFacts, storedMemories, userAuthToken);
+    const { userName: resolvedUserName, userNickname: resolvedUserNickname, promptBlock } = buildMemoryPrompt(
+      clientUserName,
+      body.userNickname,
+      [...newMemoryFacts, ...storedMemories.filter((m) => !newMemoryFacts.includes(m))]
+    );
     // Populated by the source-grounded retrieval block below; sent to the client
     // as a trailing SSE event so it can render citation chips under the reply.
     let ragCitations: { index: number; document_id: number; filename: string; snippet: string; similarity: number }[] = [];
@@ -609,7 +496,7 @@ IDENTITY INSTRUCTIONS:
   4. NEVER output generic provider defaults like "I am a large language model, trained by Google", "I am Claude, an AI created by Anthropic", or "I am DeepSeek" without first explicitly declaring that you are PRAGNA 1-A running on the selected ${modelDisplayName}${modelScript} (${modelRaw}) model tier.`;
 
     // Indian Multilingual Intelligence directive
-    console.log(`[Chat API] preferredLanguage: ${preferredLanguage}, model: ${model} (${modelDisplayName}), user: ${resolvedUserName}`);
+    console.log(`[Chat API] preferredLanguage: ${preferredLanguage}, model: ${model} (${modelDisplayName}), user: ${resolvedUserName || 'unknown'}`);
     const langInfo = preferredLanguage && preferredLanguage !== 'auto' ? INDIAN_LANGUAGE_MAP[preferredLanguage] : null;
     const languageDirective = langInfo
       ? (langInfo.code === 'en'
@@ -653,7 +540,7 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
     if (isUserNameQuery(lastUserMessage)) {
       const lastUserItem = [...conversationHistory].reverse().find((m) => m.role === 'user');
       if (lastUserItem) {
-        const nameReminder = `\n\n[MANDATORY USER IDENTITY DIRECTIVE: The user is specifically asking what their name is. You MUST check the user identity context and state directly and accurately that their name is ${resolvedUserName}${resolvedUserNickname ? ` (and their nickname is ${resolvedUserNickname})` : ''}. State their name clearly and warmly.]`;
+        const nameReminder = `\n\n[MANDATORY USER IDENTITY DIRECTIVE: The user is specifically asking what their name is. You MUST check the user identity context and state directly and accurately that their name is ${resolvedUserName || 'not known yet (say you do not know it and ask for it)'}${resolvedUserNickname ? ` (and their nickname is ${resolvedUserNickname})` : ''}. State their name clearly and warmly.]`;
         if (typeof lastUserItem.content === 'string') {
           lastUserItem.content += nameReminder;
         } else if (Array.isArray(lastUserItem.content)) {
@@ -682,7 +569,7 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
     }
 
     // Real-time automatic web search resolution
-    const autoSearch = hasImages ? null : await detectAndExecuteWebSearch(messages);
+    const autoSearch = await searchPromise;
     if (autoSearch) {
       conversationHistory.push({
         role: 'system',
