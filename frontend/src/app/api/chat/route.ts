@@ -63,6 +63,7 @@ Voice, Tone & Personality (PRAGNA 1-A Standard):
     - NEVER state or imply that you cannot generate or render images.
     - NEVER suggest external tools like Midjourney or DALL-E instead of producing the image.
     - ALWAYS present the generated image directly using markdown image syntax: ![Descriptive Title](image_url).
+    - After generate_image succeeds, include the returned \`markdown\` value verbatim in the reply so the image displays; if it fails, tell the user the exact error.
 - Document Download Links: Document tools (create_word_document, create_pdf_document, create_spreadsheet, create_presentation) return a \`download_url\` field — ALWAYS use that exact value verbatim as the link target: [Download DocumentName.ext](download_url). Never invent or guess a different link path.
 - Editing Existing Files: If the user asks to change, add to, or fix a document/spreadsheet/presentation you already created in this conversation, call the matching edit_* tool (edit_word_document, edit_spreadsheet) with \`path\` set to the exact \`download_url\` string that the earlier create_* tool result returned — do not create a new file for an edit request.
 - Diagrams: When generating architectural or flow diagrams, use Mermaid blocks (\`\`\`mermaid).
@@ -467,11 +468,12 @@ async function detectAndExecuteImageGeneration(messages: any[]): Promise<{ promp
 
   try {
     const res = await executeTool('image_generate', { prompt, aspect_ratio: aspectRatio });
-    if (res && res.imageUrl) {
+    const imgUrl = res?.image_url || res?.imageUrl;
+    if (res && res.success && imgUrl) {
       return {
         prompt,
-        imageUrl: res.imageUrl,
-        markdown: `![${prompt}](${res.imageUrl})`,
+        imageUrl: imgUrl,
+        markdown: res.markdown || `![${prompt}](${imgUrl})`,
       };
     }
   } catch (err) {
@@ -949,7 +951,11 @@ function sanitizeForLlm(text: string): string {
                 try { toolArgs = JSON.parse(toolArgs); } catch { toolArgs = {}; }
               }
               const result = await executeTool(toolName, toolArgs, userAuthToken);
-              conversationHistory.push({ role: 'tool', tool_call_id: `call_${round}_${idx}`, name: toolName, content: JSON.stringify(result) });
+              let toolContent = JSON.stringify(result);
+              if (toolContent.length > 20000) {
+                toolContent = toolContent.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, '[binary data omitted]').slice(0, 20000);
+              }
+              conversationHistory.push({ role: 'tool', tool_call_id: `call_${round}_${idx}`, name: toolName, content: toolContent });
             }
           }
 
@@ -1008,11 +1014,15 @@ function sanitizeForLlm(text: string): string {
                   let toolArgs: Record<string, any> = {};
                   try { toolArgs = JSON.parse(tc.function?.arguments || '{}'); } catch {}
                   const result = await executeTool(toolName, toolArgs, userAuthToken);
+                  let toolContent = JSON.stringify(result);
+                  if (toolContent.length > 20000) {
+                    toolContent = toolContent.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, '[binary data omitted]').slice(0, 20000);
+                  }
                   conversationHistory.push({
                     role: 'tool',
                     tool_call_id: tc.id,
                     name: toolName,
-                    content: JSON.stringify(result),
+                    content: toolContent,
                   });
                 }
               }

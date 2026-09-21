@@ -2,6 +2,8 @@ import { exec, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as os from 'node:os';
+import * as crypto from 'node:crypto';
 import { callMcpTool, isMcpToolName } from './mcpClient';
 
 const execAsync = promisify(exec);
@@ -1920,53 +1922,58 @@ export async function executeTool(name: string, args: Record<string, any>, authT
 
       case 'image_generate':
       case 'generate_image': {
-        const prompt = args.prompt || '';
+        const prompt = (args.prompt || '').trim();
         const aspectRatio = args.aspect_ratio || '1:1';
-        let width = 1024;
-        let height = 1024;
-        if (aspectRatio === '16:9') { width = 1280; height = 720; }
-        else if (aspectRatio === '9:16') { width = 720; height = 1280; }
-        else if (aspectRatio === '4:3') { width = 1024; height = 768; }
-        else if (aspectRatio === '3:4') { width = 768; height = 1024; }
-
         const apiKey = process.env.STABILITY_API_KEY || process.env.NEXT_PUBLIC_STABILITY_API_KEY;
-        if (apiKey) {
-          try {
-            const formData = new FormData();
-            formData.append('prompt', prompt);
-            formData.append('output_format', 'webp');
-            if (args.aspect_ratio) formData.append('aspect_ratio', aspectRatio);
-            const res = await fetch('https://api.stability.ai/v2beta/stable-image/generate/core', {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${apiKey}`, Accept: 'image/*' },
-              body: formData,
-            });
-            if (res.ok) {
-              const buffer = await res.arrayBuffer();
-              const base64 = Buffer.from(buffer).toString('base64');
-              const dataUrl = `data:image/webp;base64,${base64}`;
-              return {
-                success: true,
-                prompt,
-                imageUrl: dataUrl,
-                markdown: `![${prompt}](${dataUrl})`,
-                summary: `Generated an image of: "${prompt}"\n\n![${prompt}](${dataUrl})`,
-              };
-            }
-          } catch (err) {
-            console.error('Stability API error, falling back to FLUX:', err);
-          }
+
+        if (!apiKey) {
+          const errMsg = 'No Stability AI API key configured (STABILITY_API_KEY).';
+          console.error('Stability generate error:', errMsg);
+          return { success: false, error: errMsg };
         }
 
-        const seed = Math.floor(Math.random() * 1000000);
-        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
-        return {
-          success: true,
-          prompt,
-          imageUrl: pollinationsUrl,
-          markdown: `![${prompt}](${pollinationsUrl})`,
-          summary: `Generated an image of: "${prompt}"\n\n![${prompt}](${pollinationsUrl})`,
-        };
+        try {
+          const formData = new FormData();
+          formData.append('prompt', prompt);
+          formData.append('output_format', 'webp');
+          if (args.aspect_ratio) formData.append('aspect_ratio', aspectRatio);
+
+          const res = await fetch('https://api.stability.ai/v2beta/stable-image/generate/core', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${apiKey}`, Accept: 'image/*' },
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const errBody = await res.text().catch(() => '');
+            const errMsg = `${res.status} ${errBody.slice(0, 200)}`;
+            console.error('Stability generate error:', errMsg);
+            return { success: false, error: errMsg };
+          }
+
+          const buffer = Buffer.from(await res.arrayBuffer());
+          const dir = path.join(os.tmpdir(), 'pragna_images');
+          await fs.mkdir(dir, { recursive: true });
+          const filename = `${crypto.randomUUID()}.webp`;
+          const filePath = path.join(dir, filename);
+          await fs.writeFile(filePath, buffer);
+
+          const imageUrl = `/api/generated-images/${filename}`;
+          const sanitizedPrompt = prompt.replace(/[[\]()]/g, ' ').trim() || 'image';
+          const markdown = `![${sanitizedPrompt}](${imageUrl})`;
+
+          return {
+            success: true,
+            prompt,
+            image_url: imageUrl,
+            markdown,
+            summary: `Generated an image of: "${prompt}". Image is available at ${imageUrl}`,
+          };
+        } catch (err: any) {
+          const errMsg = err?.message ? String(err.message).slice(0, 200) : 'Unknown error';
+          console.error('Stability generate error:', errMsg);
+          return { success: false, error: errMsg };
+        }
       }
 
       case 'edit_image': {
