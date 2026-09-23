@@ -19,7 +19,7 @@ export default function MarkdownRenderer({ content, onOpenArtifact }: MarkdownRe
       components={{
         // Paragraphs
         p: ({ children }) => (
-          <p className="mb-3 last:mb-0 text-[0.9375rem] leading-[1.75]">{children}</p>
+          <div className="mb-3 last:mb-0 text-[0.9375rem] leading-[1.75]">{children}</div>
         ),
 
         // Headings
