@@ -355,69 +355,13 @@ async function detectAndExecuteWebSearch(messages: any[]): Promise<{ query: stri
   if (!messages || messages.length === 0) return null;
   const lastMsg = (messages[messages.length - 1]?.content || '').trim();
   if (!lastMsg) return null;
-  const lower = lastMsg.toLowerCase();
 
-  // 1. Skip pure greetings and conversational pleasantries
-  const isGreeting = /^(hi|hello|hey|greetings|good morning|good evening|good afternoon|howdy|sup|thanks|thank you|bye|goodbye|ok|okay)[!.? ]*$/i.test(lastMsg);
-  if (isGreeting) return null;
-
-  // Plain date/time questions are answered from the live clock in the system prompt, not from search results.
-  if (/^\W*(what('s|s| is| was)?|tell me)\s+(the\s+)?(current\s+|today'?s?\s+)?(date|time|day)(\s+and\s+(date|time|day))?(\s+(now|today|right now))?\W*$/i.test(lastMsg)) return null;
-
-  // 2. Skip pure arithmetic
-  if (/^what is \d+[\s+\-*/^]+\d+/i.test(lastMsg) || /^calculate /i.test(lastMsg)) return null;
-
-  // 3. Skip pure generic coding requests that have NO real-world entity, model, or product names
-  const isPureGenericCoding = /^(write|create|implement|give me|show me)\s+(a\s+)?(python|javascript|typescript|c\+\+|java|rust|go|html|css|sql|function|script|algorithm|regex|class)\s+(to\s+|for\s+)?(reverse|sort|find|sum|calculate|loop|print|check|validate)\b/i.test(lastMsg);
-  if (isPureGenericCoding) return null;
-
-  // 4. Auto-search runs for every remaining message (greetings, arithmetic, date/time and pure
-  // generic coding are skipped above). A URL in the message is searched as-is.
-  const urlMatch = lastMsg.match(/https?:\/\/[^\s]+/i);
-
-  let query = '';
-
-  if (urlMatch) {
-    // If the message is a URL or contains a URL, search for that exact URL or page
-    query = urlMatch[0];
-  } else {
-    // Clean query of conversational prefixes
-    query = lastMsg
-      .replace(/\b(dont u know|don't you know|did you know|can you|could you|please|use search|search for|search|google it|google|look up|tell me about|tell me|who is|what is|why is)\b/gi, ' ')
-      .replace(/[?!,.:;"]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Check if query has pronouns or is a short follow-up: enrich with earlier subjects
-    const hasPronouns = /\b(he|him|his|she|her|they|them|their|it|its|that|this|the actor|the politician|the model|the company|the quote|the statement)\b/i.test(lastMsg);
-    if (hasPronouns || query.split(' ').length <= 4 || messages.length > 2) {
-      const priorUserMessages = messages
-        .slice(0, -1)
-        .filter((m: any) => m.role === 'user')
-        .map((m: any) => m.content)
-        .join(' ');
-
-      const priorClean = priorUserMessages
-        .replace(/\b(hi|hello|who is|what is|tell me|about|and|famous|for|dont u know|did you know|use search)\b/gi, ' ')
-        .replace(/[?!,.:;"]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      if (priorClean) {
-        const priorWords = priorClean.split(/\s+/).filter(w => w.length > 3);
-        const missingWords = priorWords.filter(w => !lower.includes(w.toLowerCase()));
-        if (missingWords.length > 0) {
-          query = `${missingWords.slice(0, 3).join(' ')} ${query}`.trim();
-        }
-      }
-    }
-  }
-
-  query = query.slice(0, 200);
-  if (!query || query.length < 3) return null;
+  // Real-time live search runs on every user chat query
+  let query = lastMsg.slice(0, 200).trim();
+  if (!query) return null;
 
   try {
-    const searchRes = await executeTool('web_search', { query });
+    let searchRes = await executeTool('web_search', { query });
     if (searchRes && Array.isArray(searchRes.results) && searchRes.results.length > 0) {
       const topResults = searchRes.results.slice(0, 8);
       const resultsText = topResults
@@ -425,6 +369,25 @@ async function detectAndExecuteWebSearch(messages: any[]): Promise<{ query: stri
         .join('\n\n');
       return { query, resultsText, failed: false };
     }
+
+    // Try a cleaned query if the exact message returned no results
+    const cleanQuery = lastMsg
+      .replace(/[?!,.:;"]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+
+    if (cleanQuery && cleanQuery !== query) {
+      searchRes = await executeTool('web_search', { query: cleanQuery });
+      if (searchRes && Array.isArray(searchRes.results) && searchRes.results.length > 0) {
+        const topResults = searchRes.results.slice(0, 8);
+        const resultsText = topResults
+          .map((r: any, idx: number) => `[${idx + 1}] ${r.title}\n${r.snippet || ''}\nURL: ${r.url}`)
+          .join('\n\n');
+        return { query: cleanQuery, resultsText, failed: false };
+      }
+    }
+
     return { query, resultsText: '', failed: true };
   } catch (err) {
     console.warn('Auto search execution failed:', err);
@@ -637,7 +600,12 @@ Every sentence, greeting, and explanation MUST be in ${langInfo.name} (${langInf
       } else {
         conversationHistory.push({
           role: 'system',
-          content: `[LIVE WEB SEARCH RESULTS for "${autoSearch.query}"]:\n${autoSearch.resultsText}\n\nINSTRUCTION: Answer the user's inquiry directly, accurately, and honestly using these real-time search results. State the facts clearly without preamble or unnecessary disclaimers.\nThe results can disagree because some pages are outdated. When they conflict, trust the result that gives the most recent explicit date (for example "assumed office on June 3, 2026") over generic or list pages that only say "current" or "latest". Today is ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'full' })}. If any result reports a change of office or a newer event, the older claim is outdated: report the newer one and do not mention the outdated one as current.`,
+          content: `[LIVE REAL-TIME WEB SEARCH RESULTS for "${autoSearch.query}"]:\n${autoSearch.resultsText}\n\nCRITICAL MANDATORY INSTRUCTIONS:
+- You have active internet access via real-time live search.
+- The results above reflect the current live facts as of today (${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'full' })}).
+- You MUST answer the user's inquiry directly, truthfully, and accurately based on these live real-time search results.
+- NEVER contradict these live search results with outdated information from your base pre-training weights.
+- State the facts and current status clearly and directly.`,
         });
       }
     }
