@@ -445,6 +445,75 @@ async function detectAndExecuteImageGeneration(messages: any[]): Promise<{ promp
   return null;
 }
 
+async function detectAndExecuteDocumentGeneration(messages: any[]): Promise<{ title: string; format: string; downloadUrl: string; filename: string } | null> {
+  if (!messages || messages.length === 0) return null;
+  const lastMsg = (messages[messages.length - 1]?.content || '').trim();
+  if (!lastMsg) return null;
+
+  // Detect requested format
+  let format: 'pdf' | 'docx' | 'xlsx' | 'pptx' | null = null;
+  if (/\b(pdf|to pdf|as pdf|in pdf|into pdf|pdf format|pdf file|pdf document)\b/i.test(lastMsg)) format = 'pdf';
+  else if (/\b(word|docx|doc|word document|word format|docx format|to docx|as docx)\b/i.test(lastMsg)) format = 'docx';
+  else if (/\b(excel|spreadsheet|xlsx|csv|sheets|to excel|as excel|excel format)\b/i.test(lastMsg)) format = 'xlsx';
+  else if (/\b(powerpoint|presentation|slides|pptx|deck|slide deck|to pptx|as pptx)\b/i.test(lastMsg)) format = 'pptx';
+
+  if (!format) return null;
+
+  // Check if this is a document generation/conversion request
+  const isDocRequest =
+    /\b(change|convert|export|format|generate|create|make|download|save|produce|turn|give me|render|switch|provide)\b/i.test(lastMsg) ||
+    /^(to|as|into|in)\s+(pdf|docx|word|excel|pptx|presentation|spreadsheet)/i.test(lastMsg) ||
+    /\b(in|as|into|to)\s+(pdf|docx|word|excel|spreadsheet|presentation|pptx)\s*(format|file|document)?\b/i.test(lastMsg);
+
+  if (!isDocRequest) return null;
+
+  // Determine content & title:
+  let content = '';
+  let title = 'Executive Document';
+
+  const priorAssistantMsg = [...messages]
+    .slice(0, -1)
+    .reverse()
+    .find((m: any) => m.role === 'assistant')?.content || '';
+
+  if (lastMsg.length < 90 && priorAssistantMsg) {
+    content = priorAssistantMsg;
+    const headingMatch = priorAssistantMsg.match(/^#+\s*(.+)$/m) || priorAssistantMsg.match(/\*\*([^*]+)\*\*/);
+    if (headingMatch) title = headingMatch[1].trim();
+    else title = 'Generated Document';
+  } else {
+    content = lastMsg;
+    title = lastMsg
+      .replace(/\b(can you|could you|please|kindly|generate me|generate|create me|create|make me|make|export|download|change|convert|in|to|as|pdf|docx|word|excel|spreadsheet|presentation|pptx|format|file|document)\b/gi, ' ')
+      .replace(/[?!,.:;"]/g, ' ')
+      .trim()
+      .slice(0, 40) || 'Document';
+  }
+
+  try {
+    let toolName = 'create_pdf_document';
+    if (format === 'docx') toolName = 'create_word_document';
+    else if (format === 'xlsx') toolName = 'create_spreadsheet';
+    else if (format === 'pptx') toolName = 'create_presentation';
+
+    const res = await executeTool(toolName, { title, content, format });
+    if (res && res.success && res.download_url) {
+      const cleanTitle = title.replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'Document';
+      const filename = `${cleanTitle}.${format}`;
+      return {
+        title,
+        format,
+        downloadUrl: res.download_url,
+        filename,
+      };
+    }
+  } catch (err) {
+    console.warn('detectAndExecuteDocumentGeneration error:', err);
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const incomingAuth = req.headers.get('authorization') || '';
@@ -622,6 +691,22 @@ function sanitizeForLlm(text: string): string {
       conversationHistory.push({
         role: 'system',
         content: `[IMAGE GENERATION RESULT for "${autoImage.prompt}"]:\nAn image has been successfully generated for the user's request.\n\nCRITICAL INSTRUCTIONS:\n- Briefly introduce and describe the generated image in a friendly, engaging sentence or two.\n- Do NOT output generic disclaimers or say you cannot generate images.`,
+      });
+    }
+
+    // Direct Document Generation resolution (PDF, Word DOCX, Excel XLSX, PowerPoint PPTX)
+    const autoDoc = await detectAndExecuteDocumentGeneration(messages);
+    if (autoDoc) {
+      conversationHistory.push({
+        role: 'system',
+        content: `[DOCUMENT GENERATION RESULT for "${autoDoc.title}"]:\nA physical ${autoDoc.format.toUpperCase()} document has been successfully generated and is available for download at: ${autoDoc.downloadUrl}
+
+CRITICAL MANDATORY INSTRUCTIONS:
+- The requested ${autoDoc.format.toUpperCase()} document has been created successfully.
+- You MUST provide a clear, direct download link to the file in your response using exact markdown syntax:
+  [Download ${autoDoc.filename}](${autoDoc.downloadUrl})
+- Briefly introduce the generated file and confirm that it is ready for download.
+- NEVER say your document rendering engine is experiencing an outage or that you cannot generate physical files.`,
       });
     }
 

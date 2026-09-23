@@ -23,8 +23,31 @@ function resolveDocPath(rawPath: string): string {
 }
 
 async function runDocEngine(payload: any): Promise<any> {
+  // 1. First try communicating with backend REST endpoint (works seamlessly in all environments)
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/documents/engine`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend document engine REST endpoint call failed, falling back to local runner:', err);
+  }
+
+  // 2. Fallback to local subprocess
   const backendDir = path.resolve(process.cwd(), '..', 'backend');
-  const pythonPath = path.join(backendDir, '.venv', 'bin', 'python3');
+  const isWin = process.platform === 'win32';
+  const pythonPath = isWin
+    ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
+    : path.join(backendDir, '.venv', 'bin', 'python3');
+
   return new Promise((resolve) => {
     try {
       const proc = spawn(pythonPath, ['-m', 'app.document_generator', '--stdin'], {
