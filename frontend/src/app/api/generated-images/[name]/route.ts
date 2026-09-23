@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -7,11 +7,10 @@ export const runtime = 'nodejs';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ name: string }> | { name: string } }
+  { params }: { params: Promise<{ name: string }> }
 ) {
   try {
-    const resolvedParams = await Promise.resolve(params);
-    const name = resolvedParams?.name;
+    const { name } = await params;
 
     if (!name || !/^[a-f0-9-]{36}\.webp$/.test(name)) {
       return new NextResponse('Invalid image name', { status: 404 });
