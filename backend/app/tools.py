@@ -4,6 +4,7 @@ import httpx
 import json
 import subprocess
 import shutil
+import urllib.parse
 from pathlib import Path
 from typing import Any
 from bs4 import BeautifulSoup
@@ -752,25 +753,45 @@ OLLAMA_TOOLS_SCHEMA = [
 _TODO_LIST: list[str] = []
 
 
-async def perform_web_search(query: str) -> dict[str, Any]:
-    api_key = os.getenv("BRAVE_SEARCH_API_KEY")
-    if api_key:
+def _clean_ddg_url(raw_url: str) -> str:
+    if not raw_url:
+        return ""
+    if "uddg=" in raw_url:
         try:
-            async with httpx.AsyncClient() as client:
+            parsed = urllib.parse.urlparse(raw_url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "uddg" in qs:
+                return qs["uddg"][0]
+        except Exception:
+            pass
+    if raw_url.startswith("//"):
+        return "https:" + raw_url
+    return raw_url
+
+
+async def perform_web_search(query: str) -> dict[str, Any]:
+    query = query.strip()
+    if not query:
+        return {"success": False, "error": "Search query cannot be empty."}
+
+    # ── Tier 1: Brave Search API ──────────────────────────────────────────
+    brave_api_key = os.getenv("BRAVE_SEARCH_API_KEY")
+    if brave_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
                 resp = await client.get(
                     "https://api.search.brave.com/res/v1/web/search",
-                    headers={"X-Subscription-Token": api_key, "Accept": "application/json"},
-                    params={"q": query, "count": 5},
-                    timeout=10.0
+                    headers={"X-Subscription-Token": brave_api_key, "Accept": "application/json"},
+                    params={"q": query, "count": 6},
                 )
                 if resp.status_code == 200:
                     data = resp.json()
                     results = []
-                    for item in data.get("web", {}).get("results", [])[:5]:
+                    for item in data.get("web", {}).get("results", [])[:6]:
                         results.append({
-                            "title": item.get("title"),
-                            "url": item.get("url"),
-                            "snippet": item.get("description")
+                            "title": item.get("title", ""),
+                            "url": item.get("url", ""),
+                            "snippet": item.get("description", "")
                         })
                     if results:
                         logger.info("Web search answered by provider: brave for query '%s'", query)
@@ -778,40 +799,204 @@ async def perform_web_search(query: str) -> dict[str, Any]:
         except Exception as e:
             logger.warning(f"Brave search API failed: {e}")
 
-    # Fallback to DuckDuckGo HTML search
+    # ── Tier 1.5: Tavily Search API ───────────────────────────────────────
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
+    if tavily_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    "https://api.tavily.com/search",
+                    json={"api_key": tavily_api_key, "query": query, "max_results": 6},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    results = []
+                    for item in data.get("results", [])[:6]:
+                        results.append({
+                            "title": item.get("title", ""),
+                            "url": item.get("url", ""),
+                            "snippet": item.get("content", "")
+                        })
+                    if results:
+                        logger.info("Web search answered by provider: tavily for query '%s'", query)
+                        return {"success": True, "query": query, "provider": "tavily", "results": results}
+        except Exception as e:
+            logger.warning(f"Tavily search API failed: {e}")
+
+    # ── Tier 1.6: Serper Google Search API ────────────────────────────────
+    serper_api_key = os.getenv("SERPER_API_KEY")
+    if serper_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    "https://google.serper.dev/search",
+                    headers={"X-API-KEY": serper_api_key, "Content-Type": "application/json"},
+                    json={"q": query, "num": 6},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    results = []
+                    for item in data.get("organic", [])[:6]:
+                        results.append({
+                            "title": item.get("title", ""),
+                            "url": item.get("link", ""),
+                            "snippet": item.get("snippet", "")
+                        })
+                    if results:
+                        logger.info("Web search answered by provider: serper for query '%s'", query)
+                        return {"success": True, "query": query, "provider": "serper", "results": results}
+        except Exception as e:
+            logger.warning(f"Serper search API failed: {e}")
+
+    browser_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+    # ── Tier 2: DuckDuckGo Lite ───────────────────────────────────────────
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=8.0) as client:
+            resp = await client.post(
+                "https://lite.duckduckgo.com/lite/",
+                data={"q": query},
+                headers={**browser_headers, "Referer": "https://lite.duckduckgo.com/"}
+            )
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                links = soup.find_all("a", class_="result-link")
+                snippets = soup.find_all("td", class_="result-snippet")
+                results = []
+                for i, link in enumerate(links[:6]):
+                    title = link.get_text(strip=True)
+                    href = _clean_ddg_url(link.get("href", ""))
+                    snippet = snippets[i].get_text(strip=True) if i < len(snippets) else ""
+                    if title and (href or snippet):
+                        results.append({"title": title, "url": href, "snippet": snippet})
+                if results:
+                    logger.info("Web search answered by provider: duckduckgo-lite for query '%s'", query)
+                    return {"success": True, "query": query, "provider": "duckduckgo-lite", "results": results}
+    except Exception as e:
+        logger.warning(f"DuckDuckGo Lite search failed: {e}")
+
+    # ── Tier 3: DuckDuckGo HTML ───────────────────────────────────────────
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=8.0) as client:
             resp = await client.post(
                 "https://html.duckduckgo.com/html/",
                 data={"q": query},
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-                timeout=10.0
+                headers=browser_headers
             )
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.text, "html.parser")
                 results = []
-                for result in soup.find_all("a", class_="result__url")[:5]:
-                    parent = result.find_parent("div", class_="result__body")
-                    if parent:
-                        title_elem = parent.find("a", class_="result__a")
-                        snippet_elem = parent.find("a", class_="result__snippet")
+                for res_div in soup.find_all("div", class_="result__body")[:6]:
+                    title_elem = res_div.find("a", class_="result__a") or res_div.find("a", class_="result__url")
+                    snippet_elem = res_div.find("a", class_="result__snippet")
+                    url_elem = res_div.find("a", class_="result__url") or title_elem
+                    title = title_elem.get_text(strip=True) if title_elem else ""
+                    raw_href = url_elem.get("href", "") if url_elem else ""
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    if title or snippet:
                         results.append({
-                            "title": title_elem.get_text(strip=True) if title_elem else "Result",
-                            "url": result.get("href", "").strip(),
-                            "snippet": snippet_elem.get_text(strip=True) if snippet_elem else ""
+                            "title": title or "Search Result",
+                            "url": _clean_ddg_url(raw_href),
+                            "snippet": snippet
                         })
                 if results:
-                    logger.info("Web search answered by provider: duckduckgo for query '%s'", query)
-                    return {"success": True, "query": query, "provider": "duckduckgo", "results": results}
+                    logger.info("Web search answered by provider: duckduckgo-html for query '%s'", query)
+                    return {"success": True, "query": query, "provider": "duckduckgo-html", "results": results}
     except Exception as e:
-        logger.warning(f"DuckDuckGo search fallback failed: {e}")
+        logger.warning(f"DuckDuckGo HTML search fallback failed: {e}")
 
-    logger.info("Web search answered by provider: placeholder for query '%s'", query)
+    # ── Tier 4: Wikipedia Real-time Search & Summary API ─────────────────
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            wiki_headers = {"User-Agent": "PragnaAI/1.0 (https://pragna.ai; contact@pragna.ai)"}
+            resp = await client.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={"action": "query", "list": "search", "srsearch": query, "utf8": "", "format": "json"},
+                headers=wiki_headers
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                results = []
+                search_items = data.get("query", {}).get("search", [])[:5]
+                for item in search_items:
+                    title = item.get("title", "")
+                    pageid = item.get("pageid", "")
+                    clean_snippet = BeautifulSoup(item.get("snippet", ""), "html.parser").get_text(strip=True)
+                    url = f"https://en.wikipedia.org/?curid={pageid}" if pageid else f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title)}"
+
+                    if len(results) < 2 and title:
+                        try:
+                            sum_resp = await client.get(
+                                f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(title)}",
+                                headers=wiki_headers,
+                                timeout=4.0
+                            )
+                            if sum_resp.status_code == 200:
+                                sum_data = sum_resp.json()
+                                extract = sum_data.get("extract", "").strip()
+                                page_url = sum_data.get("content_urls", {}).get("desktop", {}).get("page")
+                                if extract:
+                                    clean_snippet = extract
+                                if page_url:
+                                    url = page_url
+                        except Exception:
+                            pass
+
+                    if title and clean_snippet:
+                        results.append({"title": title, "url": url, "snippet": clean_snippet})
+                if results:
+                    logger.info("Web search answered by provider: wikipedia for query '%s'", query)
+                    return {"success": True, "query": query, "provider": "wikipedia", "results": results}
+    except Exception as e:
+        logger.warning(f"Wikipedia search fallback failed: {e}")
+
+    # ── Tier 5: DuckDuckGo Instant Answer API ────────────────────────────
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                "https://api.duckduckgo.com/",
+                params={"q": query, "format": "json", "no_html": "1"},
+                headers=browser_headers
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                results = []
+                abstract = data.get("AbstractText", "").strip()
+                abstract_url = data.get("AbstractURL", "").strip()
+                heading = data.get("Heading", "").strip()
+                if abstract:
+                    results.append({
+                        "title": heading or f"Overview for {query}",
+                        "url": abstract_url or f"https://duckduckgo.com/?q={urllib.parse.quote(query)}",
+                        "snippet": abstract
+                    })
+                for topic in data.get("RelatedTopics", [])[:4]:
+                    if isinstance(topic, dict) and topic.get("Text"):
+                        results.append({
+                            "title": topic.get("Text")[:60],
+                            "url": topic.get("FirstURL", f"https://duckduckgo.com/?q={urllib.parse.quote(query)}"),
+                            "snippet": topic.get("Text")
+                        })
+                if results:
+                    logger.info("Web search answered by provider: duckduckgo-instant for query '%s'", query)
+                    return {"success": True, "query": query, "provider": "duckduckgo-instant", "results": results}
+    except Exception as e:
+        logger.warning(f"DuckDuckGo Instant Answer API failed: {e}")
+
+    logger.info("Web search answered by provider: fallback for query '%s'", query)
     return {
         "success": True,
         "query": query,
-        "provider": "placeholder",
-        "results": [{"title": f"Search: {query}", "url": f"https://duckduckgo.com/?q={query}", "snippet": f"Results for '{query}'."}]
+        "provider": "fallback",
+        "results": [{
+            "title": f"Search for '{query}'",
+            "url": f"https://duckduckgo.com/?q={urllib.parse.quote(query)}",
+            "snippet": f"Web search results for '{query}'."
+        }]
     }
 
 
