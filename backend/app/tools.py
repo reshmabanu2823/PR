@@ -786,6 +786,32 @@ async def perform_web_search(query: str) -> dict[str, Any]:
         "Accept-Language": "en-US,en;q=0.9",
     }
 
+    # ── 0. OmniRoute /v1/search: runs from the gateway host, so hosted backends
+    #       avoid datacenter IPs that DuckDuckGo/Bing block ─────────────────────
+    omni_key = os.getenv("OMNIROUTE_API_KEY", "").strip()
+    if omni_key:
+        omni_base = os.getenv("OMNIROUTE_BASE_URL", "http://127.0.0.1:20128").rstrip("/")
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{omni_base}/v1/search",
+                    headers={"Authorization": f"Bearer {omni_key}"},
+                    json={"query": query, "provider": "duckduckgo-free", "max_results": 5},
+                )
+                resp.raise_for_status()
+            results = []
+            for item in resp.json().get("results", []):
+                title = (item.get("title") or "").strip()
+                url = (item.get("url") or "").strip()
+                snippet = (item.get("snippet") or "").strip()
+                if title and (url or snippet):
+                    results.append({"title": title, "url": url, "snippet": snippet})
+            if results:
+                logger.info("Web search answered by provider: omniroute for query '%s'", query)
+                return {"success": True, "query": query, "provider": "omniroute", "results": results[:5]}
+        except Exception as e:
+            logger.warning("omniroute search failed for query '%s': %s", query, e)
+
     # ── 1. Primary: ddgs package ──────────────────────────────────────────
     for attempt in range(2):
         try:
